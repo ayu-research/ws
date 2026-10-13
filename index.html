@@ -56,10 +56,6 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 .btn:hover{background:#25344b}
 .btn-success{background:#16804e;}
 .btn-success:hover{background:#0f5e38;}
-.schedule{display:grid;grid-template-columns:1fr 1fr;gap:15px}
-.schedule label{font-size:12px;color:#69778b}
-.schedule input{display:block;width:100%;padding:10px;margin-top:7px;border:1px solid #dce3eb;border-radius:8px}
-.note{margin-top:15px;padding:12px;background:#f5f8fb;border-radius:8px;line-height:1.5;font-size:12px}
 @media(max-width:1050px){.cards{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:800px){.side{width:65px;padding:15px 7px}.brand div:not(.logo),.nav span,.foot{display:none}main{margin-left:65px;width:calc(100% - 65px);padding:0 15px}.cards,.cols,.charts{grid-template-columns:1fr}.chart.full{grid-column:auto}.top{height:auto;padding:15px 0}.clock{display:none}}
 @media(max-width:500px){.cards{grid-template-columns:1fr}}
@@ -82,7 +78,6 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
       <a data-page="dashboard" class="active">⌂ <span>Dashboard</span></a>
       <a data-page="grafik">◒ <span>Grafik</span></a>
       <a data-page="histori">◷ <span>Histori</span></a>
-      <a data-page="jadwal">◉ <span>Jadwal Sistem</span></a>
     </nav>
     <div class="foot">
       <span id="connDot" class="dot"></span>
@@ -209,40 +204,14 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
         </table>
       </div>
     </section>
-
-    <!-- PAGE 4: JADWAL -->
-    <section id="jadwal" class="page">
-      <div class="intro">
-        <h2>Jadwal Otomasi Sistem</h2>
-        <p>Konfigurasi jadwal pengoperasian terencana.</p>
-      </div>
-      <div class="panel">
-        <div class="schedule">
-          <div>
-            <label>Waktu Nyala (ON)</label>
-            <input type="time" id="timeOn" value="18:00">
-          </div>
-          <div>
-            <label>Waktu Mati (OFF)</label>
-            <input type="time" id="timeOff" value="06:00">
-          </div>
-        </div>
-        <div style="margin-top: 15px;">
-          <button class="btn" onclick="alert('Jadwal berhasil disimpan!')">Simpan Jadwal</button>
-        </div>
-        <div class="note">
-          <b>Catatan:</b> Jadwal otomatisasi ini dapat disinkronkan dengan mikrokontroler (ESP32) untuk menyalakan sistem sesuai jam yang ditentukan.
-        </div>
-      </div>
-    </section>
   </main>
 </div>
 
 <script>
 // =========================================================
-// 1. LOGIKA NAVIGASI MENU (Dipindah ke atas agar kebal error)
+// 1. LOGIKA NAVIGASI MENU
 // =========================================================
-let cSuhu, cKelembapan, cCahaya, cAngin, cHujan; // Variabel chart global
+let cSuhu, cKelembapan, cCahaya, cAngin, cHujan;
 const navLinks = document.querySelectorAll('.nav a');
 const pages = document.querySelectorAll('.page');
 
@@ -251,16 +220,13 @@ navLinks.forEach(link => {
     e.preventDefault();
     const targetPage = this.getAttribute('data-page');
 
-    // Hapus class 'active' dari semua tombol dan halaman
     navLinks.forEach(l => l.classList.remove('active'));
     pages.forEach(p => p.classList.remove('active'));
 
-    // Tambahkan class 'active' pada yang diklik
     this.classList.add('active');
     const targetElement = document.getElementById(targetPage);
     if(targetElement) targetElement.classList.add('active');
 
-    // Resize chart jika membuka halaman grafik
     if(targetPage === 'grafik') {
       try {
         if(typeof cSuhu !== 'undefined' && cSuhu) cSuhu.resize();
@@ -297,7 +263,7 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-let globalHistoryData = []; // Untuk simpan data CSV
+let globalHistoryData = [];
 
 // Indikator Koneksi
 const connDot = document.getElementById('connDot');
@@ -351,7 +317,7 @@ historyRef.limitToLast(20).on('value', (snapshot) => {
   }
 
   const items = Object.values(dataObj);
-  globalHistoryData = items.slice().reverse(); // Urutan terbaru di atas
+  globalHistoryData = items.slice().reverse();
   
   if(tableBody) {
     tableBody.innerHTML = '';
@@ -371,7 +337,6 @@ historyRef.limitToLast(20).on('value', (snapshot) => {
     });
   }
 
-  // Panggil fungsi render grafik
   renderCharts(items);
 });
 
@@ -379,7 +344,6 @@ historyRef.limitToLast(20).on('value', (snapshot) => {
 // 6. FUNGSI RENDER CHART.JS
 // =========================================================
 function renderCharts(dataItems) {
-  // Hanya jalankan jika elemen canvas tersedia
   if(!document.getElementById('chartSuhu')) return;
 
   const labels = dataItems.map(d => (d.timestamp ? d.timestamp.split(' ')[1] || d.timestamp : '-'));
