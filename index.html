@@ -56,8 +56,23 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 .btn:hover{background:#25344b}
 .btn-success{background:#16804e;}
 .btn-success:hover{background:#0f5e38;}
+
+/* Style khusus untuk Filter Waktu */
+.filter-wrap {display:flex; align-items:center; gap:10px;}
+.filter-wrap label {font-size: 13px; font-weight: bold; color: #6f7d90;}
+.filter-wrap select {padding: 8px 12px; border-radius: 8px; border: 1px solid #dce3eb; outline: none; font-family: inherit; font-weight: bold; color: #172033; background: #fff;}
+
 @media(max-width:1050px){.cards{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:800px){.side{width:65px;padding:15px 7px}.brand div:not(.logo),.nav span,.foot{display:none}main{margin-left:65px;width:calc(100% - 65px);padding:0 15px}.cards,.cols,.charts{grid-template-columns:1fr}.chart.full{grid-column:auto}.top{height:auto;padding:15px 0}.clock{display:none}}
+@media(max-width:800px){
+  .side{width:65px;padding:15px 7px}
+  .brand div:not(.logo),.nav span,.foot{display:none}
+  main{margin-left:65px;width:calc(100% - 65px);padding:0 15px}
+  .cards,.cols,.charts{grid-template-columns:1fr}
+  .chart.full{grid-column:auto}
+  .top{height:auto;padding:15px 0}
+  .clock{display:none}
+  .intro{flex-direction:column; align-items:flex-start; gap:10px;}
+}
 @media(max-width:500px){.cards{grid-template-columns:1fr}}
 </style>
 
@@ -142,11 +157,22 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
       </div>
     </section>
 
-    <!-- PAGE 2: GRAFIK (5 GRAFIK) -->
+    <!-- PAGE 2: GRAFIK (5 GRAFIK) dengan FILTER -->
     <section id="grafik" class="page">
-      <div class="intro">
-        <h2>Grafik Tren Parameter</h2>
-        <p>Visualisasi perubahan tiap variabel lingkungan berdasarkan data histori secara mandiri.</p>
+      <div class="intro" style="display:flex; justify-content:space-between; align-items:flex-end;">
+        <div>
+          <h2>Grafik Tren Parameter</h2>
+          <p>Visualisasi histori (Rata-rata/Realtime) yang akan terus diakumulasi.</p>
+        </div>
+        <div class="filter-wrap">
+          <label>Tampilkan Filter:</label>
+          <select id="timeFilter">
+            <option value="menit">Per Menit (Realtime)</option>
+            <option value="jam">Per Jam (Rata-rata)</option>
+            <option value="hari">Per Hari (Rata-rata)</option>
+            <option value="bulan">Per Bulan (Rata-rata)</option>
+          </select>
+        </div>
       </div>
       <div class="charts">
         <div class="chart">
@@ -197,9 +223,7 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
             </tr>
           </thead>
           <tbody id="tableBody">
-            <tr>
-              <td colspan="7" style="text-align: center; color: #8491a3;">Memuat data...</td>
-            </tr>
+            <!-- Data tabel dimasukkan oleh JavaScript -->
           </tbody>
         </table>
       </div>
@@ -229,14 +253,12 @@ navLinks.forEach(link => {
 
     if(targetPage === 'grafik') {
       try {
-        if(typeof cSuhu !== 'undefined' && cSuhu) cSuhu.resize();
-        if(typeof cKelembapan !== 'undefined' && cKelembapan) cKelembapan.resize();
-        if(typeof cCahaya !== 'undefined' && cCahaya) cCahaya.resize();
-        if(typeof cAngin !== 'undefined' && cAngin) cAngin.resize();
-        if(typeof cHujan !== 'undefined' && cHujan) cHujan.resize();
-      } catch (err) {
-        console.warn('Grafik belum dimuat sepenuhnya.', err);
-      }
+        if(cSuhu) cSuhu.resize();
+        if(cKelembapan) cKelembapan.resize();
+        if(cCahaya) cCahaya.resize();
+        if(cAngin) cAngin.resize();
+        if(cHujan) cHujan.resize();
+      } catch (err) {}
     }
   });
 });
@@ -256,40 +278,33 @@ setInterval(updateClock, 1000);
 updateClock();
 
 // =========================================================
-// 3. FIREBASE CONFIGURATION & INISIALISASI
+// 3. FIREBASE CONFIGURATION
 // =========================================================
 const firebaseConfig = {
   databaseURL: "https://monitoring-energi-terbarukan-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-let globalHistoryData = [];
+let globalHistoryData = []; // Untuk CSV
 
 // Indikator Koneksi
 const connDot = document.getElementById('connDot');
 const connText = document.getElementById('conn');
 const dbStatusText = document.getElementById('dbStatusText');
-
 db.ref(".info/connected").on("value", (snap) => {
   if (snap.val() === true) {
     if(connDot) connDot.classList.add("on");
     if(connText) connText.textContent = "Terhubung";
-    if(dbStatusText) {
-      dbStatusText.textContent = "Connected";
-      dbStatusText.style.color = "#16804e";
-    }
+    if(dbStatusText) { dbStatusText.textContent = "Connected"; dbStatusText.style.color = "#16804e"; }
   } else {
     if(connDot) connDot.classList.remove("on");
     if(connText) connText.textContent = "Terputus";
-    if(dbStatusText) {
-      dbStatusText.textContent = "Disconnected";
-      dbStatusText.style.color = "#bf4350";
-    }
+    if(dbStatusText) { dbStatusText.textContent = "Disconnected"; dbStatusText.style.color = "#bf4350"; }
   }
 });
 
 // =========================================================
-// 4. MONITORING REAL-TIME DASHBOARD
+// 4. MONITORING REAL-TIME DASHBOARD (1 DATA TERAKHIR)
 // =========================================================
 const historyRef = db.ref('history');
 historyRef.limitToLast(1).on('child_added', (snapshot) => {
@@ -304,92 +319,158 @@ historyRef.limitToLast(1).on('child_added', (snapshot) => {
 });
 
 // =========================================================
-// 5. LOAD HISTORI TABEL & RENDER GRAFIK
+// 5. INISIALISASI GRAFIK KOSONG
 // =========================================================
-historyRef.limitToLast(20).on('value', (snapshot) => {
-  const dataObj = snapshot.val();
-  const tableBody = document.getElementById('tableBody');
-  
-  if (!dataObj) {
-    if(tableBody) tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Belum ada data histori.</td></tr>';
-    globalHistoryData = [];
-    return;
-  }
-
-  const items = Object.values(dataObj);
-  globalHistoryData = items.slice().reverse();
-  
-  if(tableBody) {
-    tableBody.innerHTML = '';
-    globalHistoryData.forEach((item, index) => {
-      const row = `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${item.timestamp || '-'}</td>
-          <td>${Math.round(item.suhu ?? 0)} °C</td>
-          <td>${Math.round(item.kelembapan ?? 0)} %</td>
-          <td>${Math.round(item.kecepatan_angin ?? 0)} m/s</td>
-          <td>${Math.round(item.cahaya_lux ?? 0)} Lux</td>
-          <td>${Math.round(item.curah_hujan ?? 0)}</td>
-        </tr>
-      `;
-      tableBody.innerHTML += row;
-    });
-  }
-
-  renderCharts(items);
-});
-
-// =========================================================
-// 6. FUNGSI RENDER CHART.JS
-// =========================================================
-function renderCharts(dataItems) {
+function initCharts() {
   if(!document.getElementById('chartSuhu')) return;
-
-  const labels = dataItems.map(d => (d.timestamp ? d.timestamp.split(' ')[1] || d.timestamp : '-'));
-  const dataSuhu = dataItems.map(d => Math.round(d.suhu ?? 0));
-  const dataKelembapan = dataItems.map(d => Math.round(d.kelembapan ?? 0));
-  const dataCahaya = dataItems.map(d => Math.round(d.cahaya_lux ?? 0));
-  const dataAngin = dataItems.map(d => Math.round(d.kecepatan_angin ?? 0));
-  const dataHujan = dataItems.map(d => Math.round(d.curah_hujan ?? 0));
-
-  if (cSuhu) cSuhu.destroy();
-  if (cKelembapan) cKelembapan.destroy();
-  if (cCahaya) cCahaya.destroy();
-  if (cAngin) cAngin.destroy();
-  if (cHujan) cHujan.destroy();
-
   const chartOptions = { responsive: true, maintainAspectRatio: false };
 
   cSuhu = new Chart(document.getElementById('chartSuhu').getContext('2d'), {
-    type: 'line',
-    data: { labels: labels, datasets: [{ label: 'Suhu (°C)', data: dataSuhu, borderColor: '#ef5663', backgroundColor: 'rgba(239, 86, 99, 0.1)', tension: 0.3, fill: true }] },
-    options: chartOptions
+    type: 'line', data: { labels: [], datasets: [{ label: 'Suhu (°C)', data: [], borderColor: '#ef5663', backgroundColor: 'rgba(239, 86, 99, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
   });
-
   cKelembapan = new Chart(document.getElementById('chartKelembapan').getContext('2d'), {
-    type: 'line',
-    data: { labels: labels, datasets: [{ label: 'Kelembapan (%)', data: dataKelembapan, borderColor: '#20c77b', backgroundColor: 'rgba(32, 199, 123, 0.1)', tension: 0.3, fill: true }] },
-    options: chartOptions
+    type: 'line', data: { labels: [], datasets: [{ label: 'Kelembapan (%)', data: [], borderColor: '#20c77b', backgroundColor: 'rgba(32, 199, 123, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
   });
-
   cCahaya = new Chart(document.getElementById('chartCahaya').getContext('2d'), {
-    type: 'line',
-    data: { labels: labels, datasets: [{ label: 'Cahaya (Lux)', data: dataCahaya, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true }] },
-    options: chartOptions
+    type: 'line', data: { labels: [], datasets: [{ label: 'Cahaya (Lux)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
   });
-
   cAngin = new Chart(document.getElementById('chartAngin').getContext('2d'), {
-    type: 'line',
-    data: { labels: labels, datasets: [{ label: 'Angin (m/s)', data: dataAngin, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: true }] },
-    options: chartOptions
+    type: 'line', data: { labels: [], datasets: [{ label: 'Angin (m/s)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
+  });
+  cHujan = new Chart(document.getElementById('chartHujan').getContext('2d'), {
+    type: 'bar', data: { labels: [], datasets: [{ label: 'Curah Hujan (mm)', data: [], backgroundColor: '#8b5cf6' }] }, options: chartOptions
+  });
+}
+initCharts();
+
+// =========================================================
+// 6. LOGIKA FETCH DATA & PENGELOMPOKAN (FILTERING) GRAFIK
+// =========================================================
+let rawDataArray = []; // Menyimpan SELURUH data yang masuk tanpa terhapus
+let drawChartTimeout;
+let tableIndex = 0;
+const tableBody = document.getElementById('tableBody');
+if (tableBody) tableBody.innerHTML = '';
+
+// Event ketika pilihan filter waktu diganti
+document.getElementById('timeFilter').addEventListener('change', () => {
+  processDataForChart(); // Hitung ulang array data untuk dirender ke grafik
+});
+
+// Ambil 1000 data masa lalu agar bisa dikelompokkan ke Jam/Hari/Bulan
+historyRef.limitToLast(1000).on('child_added', (snapshot) => {
+  const item = snapshot.val();
+  if (!item) return;
+
+  // 1. Simpan selalu ke dalam array (Data terus terakumulasi)
+  rawDataArray.push(item);
+  globalHistoryData.unshift(item); // Untuk CSV
+  tableIndex++;
+
+  // 2. Tampilkan di Tabel
+  const row = `
+    <tr>
+      <td>${tableIndex}</td>
+      <td>${item.timestamp || '-'}</td>
+      <td>${Math.round(item.suhu ?? 0)} °C</td>
+      <td>${Math.round(item.kelembapan ?? 0)} %</td>
+      <td>${Math.round(item.kecepatan_angin ?? 0)} m/s</td>
+      <td>${Math.round(item.cahaya_lux ?? 0)} Lux</td>
+      <td>${Math.round(item.curah_hujan ?? 0)}</td>
+    </tr>
+  `;
+  if(tableBody) {
+    tableBody.insertAdjacentHTML('afterbegin', row);
+  }
+
+  // 3. Render ulang grafik menggunakan sistem DEBOUNCE
+  // Agar browser tidak lag saat pertama kali load data yang banyak.
+  clearTimeout(drawChartTimeout);
+  drawChartTimeout = setTimeout(() => {
+    processDataForChart();
+  }, 300);
+});
+
+// FUNGSI UTAMA: Mengelompokkan data berdasarkan Menit/Jam/Hari/Bulan
+function processDataForChart() {
+  const filter = document.getElementById('timeFilter').value;
+  const grouped = {};
+
+  rawDataArray.forEach(item => {
+    if (!item.timestamp) return;
+    
+    // Pecah format "YYYY-MM-DD HH:mm:ss"
+    let parts = item.timestamp.split(' ');
+    let datePart = parts[0] || ""; 
+    let timePart = parts[1] || "00:00:00"; 
+    
+    let key = item.timestamp; // Default fallback
+
+    // Menentukan pengelompokan berdasarkan filter
+    if (filter === 'menit') {
+      key = datePart + ' ' + timePart.substring(0, 5); // Format: YYYY-MM-DD HH:mm
+    } else if (filter === 'jam') {
+      key = datePart + ' ' + timePart.substring(0, 2) + ':00'; // Format: YYYY-MM-DD HH:00
+    } else if (filter === 'hari') {
+      key = datePart; // Format: YYYY-MM-DD
+    } else if (filter === 'bulan') {
+      let dParts = datePart.split(/[-/]/);
+      if (dParts.length === 3) {
+        if (dParts[0].length === 4) {
+          key = dParts[0] + '-' + dParts[1]; // Format YYYY-MM
+        } else {
+          key = dParts[2] + '-' + dParts[1]; // Format DD-MM-YYYY -> YYYY-MM
+        }
+      } else {
+        key = datePart;
+      }
+    }
+
+    // Hitung akumulasi (Untuk dicari rata-ratanya nanti)
+    if (!grouped[key]) {
+      grouped[key] = { count: 0, suhu: 0, kelembapan: 0, angin: 0, cahaya: 0, hujan: 0 };
+    }
+    grouped[key].suhu += Number(item.suhu) || 0;
+    grouped[key].kelembapan += Number(item.kelembapan) || 0;
+    grouped[key].angin += Number(item.kecepatan_angin) || 0;
+    grouped[key].cahaya += Number(item.cahaya_lux) || 0;
+    grouped[key].hujan += Number(item.curah_hujan) || 0;
+    grouped[key].count += 1;
   });
 
-  cHujan = new Chart(document.getElementById('chartHujan').getContext('2d'), {
-    type: 'bar', 
-    data: { labels: labels, datasets: [{ label: 'Curah Hujan (mm)', data: dataHujan, backgroundColor: '#8b5cf6' }] },
-    options: chartOptions
+  // Siapkan Array untuk diinject ke Chart.js
+  const labels = [];
+  const dataSuhu = [];
+  const dataKelembapan = [];
+  const dataAngin = [];
+  const dataCahaya = [];
+  const dataHujan = [];
+
+  Object.keys(grouped).forEach(k => {
+    labels.push(k);
+    let g = grouped[k];
+    
+    // Dapatkan Nilai Rata-rata dari kelompok jam/hari/bulan
+    dataSuhu.push((g.suhu / g.count).toFixed(1));
+    dataKelembapan.push((g.kelembapan / g.count).toFixed(1));
+    dataAngin.push((g.angin / g.count).toFixed(1));
+    dataCahaya.push((g.cahaya / g.count).toFixed(1));
+    dataHujan.push((g.hujan / g.count).toFixed(1)); 
   });
+
+  // Timpa (Update) grafik dengan susunan data baru yang sudah di-filter
+  updateChartData(cSuhu, labels, dataSuhu);
+  updateChartData(cKelembapan, labels, dataKelembapan);
+  updateChartData(cCahaya, labels, dataCahaya);
+  updateChartData(cAngin, labels, dataAngin);
+  updateChartData(cHujan, labels, dataHujan);
+}
+
+function updateChartData(chart, labels, data) {
+  if (!chart) return;
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = data;
+  chart.update(); // Memicu re-render visual
 }
 
 // =========================================================
