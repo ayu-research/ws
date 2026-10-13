@@ -109,7 +109,7 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
     <section id="dashboard" class="page active">
       <div class="intro">
         <h2>Ringkasan Real-Time</h2>
-        <p>Parameter sensor lingkungan dan status kontrol beban terhubung secara live.</p>
+        <p>Parameter sensor lingkungan dan status sistem terhubung secara live.</p>
       </div>
 
       <div class="cards">
@@ -141,7 +141,7 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
           <div class="status">
             <div><span>Pembaruan Terakhir:</span> <strong id="lastUpdate">-</strong></div>
             <div><span>Status Database:</span> <strong id="dbStatusText" style="color: #bf4350;">Disconnected</strong></div>
-            <div><span>Lokasi Node:</span> <strong>/history & /control</strong></div>
+            <div><span>Lokasi Node:</span> <strong>/history</strong></div>
           </div>
         </div>
       </div>
@@ -231,7 +231,7 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
           <button class="btn" onclick="alert('Jadwal berhasil disimpan!')">Simpan Jadwal</button>
         </div>
         <div class="note">
-          <b>Catatan:</b> Jadwal otomatisasi ini dapat disinkronkan dengan mikrokontroler (ESP32) untuk menyalakan relay sesuai jam yang ditentukan.
+          <b>Catatan:</b> Jadwal otomatisasi ini dapat disinkronkan dengan mikrokontroler (ESP32) untuk menyalakan sistem sesuai jam yang ditentukan.
         </div>
       </div>
     </section>
@@ -239,156 +239,150 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 </div>
 
 <script>
-// --- 1. FIREBASE CONFIGURATION ---
+// =========================================================
+// 1. LOGIKA NAVIGASI MENU (Dipindah ke atas agar kebal error)
+// =========================================================
+let cSuhu, cKelembapan, cCahaya, cAngin, cHujan; // Variabel chart global
+const navLinks = document.querySelectorAll('.nav a');
+const pages = document.querySelectorAll('.page');
+
+navLinks.forEach(link => {
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    const targetPage = this.getAttribute('data-page');
+
+    // Hapus class 'active' dari semua tombol dan halaman
+    navLinks.forEach(l => l.classList.remove('active'));
+    pages.forEach(p => p.classList.remove('active'));
+
+    // Tambahkan class 'active' pada yang diklik
+    this.classList.add('active');
+    const targetElement = document.getElementById(targetPage);
+    if(targetElement) targetElement.classList.add('active');
+
+    // Resize chart jika membuka halaman grafik
+    if(targetPage === 'grafik') {
+      try {
+        if(typeof cSuhu !== 'undefined' && cSuhu) cSuhu.resize();
+        if(typeof cKelembapan !== 'undefined' && cKelembapan) cKelembapan.resize();
+        if(typeof cCahaya !== 'undefined' && cCahaya) cCahaya.resize();
+        if(typeof cAngin !== 'undefined' && cAngin) cAngin.resize();
+        if(typeof cHujan !== 'undefined' && cHujan) cHujan.resize();
+      } catch (err) {
+        console.warn('Grafik belum dimuat sepenuhnya.', err);
+      }
+    }
+  });
+});
+
+// =========================================================
+// 2. JAM DIGITAL REALTIME
+// =========================================================
+function updateClock() {
+  const now = new Date();
+  const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const dateEl = document.getElementById('liveClockDate');
+  const timeEl = document.getElementById('liveClockTime');
+  if(dateEl) dateEl.textContent = now.toLocaleDateString('id-ID', dateOptions);
+  if(timeEl) timeEl.textContent = now.toLocaleTimeString('id-ID') + ' WIB';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// =========================================================
+// 3. FIREBASE CONFIGURATION & INISIALISASI
+// =========================================================
 const firebaseConfig = {
   databaseURL: "https://monitoring-energi-terbarukan-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
-// State Variabel
 let globalHistoryData = []; // Untuk simpan data CSV
-let cSuhu, cKelembapan, cCahaya, cAngin, cHujan; // Objek Chart 1-5
 
-// --- 2. NAVIGASI TULISAN HALAMAN (SPA) ---
-const navLinks = document.querySelectorAll('.nav a');
-const pages = document.querySelectorAll('.page');
-
-navLinks.forEach(link => {
-  link.addEventListener('click', (e) => {
-    e.preventDefault();
-    const targetPage = link.getAttribute('data-page');
-
-    navLinks.forEach(l => l.classList.remove('active'));
-    pages.forEach(p => p.classList.remove('active'));
-
-    link.classList.add('active');
-    document.getElementById(targetPage).classList.add('active');
-
-    // Re-render chart jika buka halaman grafik agar tidak pipih
-    if(targetPage === 'grafik') {
-      if(cSuhu) cSuhu.resize();
-      if(cKelembapan) cKelembapan.resize();
-      if(cCahaya) cCahaya.resize();
-      if(cAngin) cAngin.resize();
-      if(cHujan) cHujan.resize();
-    }
-  });
-});
-
-// --- 3. JAM DIGITAL REALTIME ---
-function updateClock() {
-  const now = new Date();
-  const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  document.getElementById('liveClockDate').textContent = now.toLocaleDateString('id-ID', dateOptions);
-  document.getElementById('liveClockTime').textContent = now.toLocaleTimeString('id-ID') + ' WIB';
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-// --- 4. INDIKATOR KONEKSI DATABASE ---
+// Indikator Koneksi
 const connDot = document.getElementById('connDot');
 const connText = document.getElementById('conn');
 const dbStatusText = document.getElementById('dbStatusText');
 
 db.ref(".info/connected").on("value", (snap) => {
   if (snap.val() === true) {
-    connDot.classList.add("on");
-    connText.textContent = "Terhubung";
-    dbStatusText.textContent = "Connected";
-    dbStatusText.style.color = "#16804e";
+    if(connDot) connDot.classList.add("on");
+    if(connText) connText.textContent = "Terhubung";
+    if(dbStatusText) {
+      dbStatusText.textContent = "Connected";
+      dbStatusText.style.color = "#16804e";
+    }
   } else {
-    connDot.classList.remove("on");
-    connText.textContent = "Terputus";
-    dbStatusText.textContent = "Disconnected";
-    dbStatusText.style.color = "#bf4350";
+    if(connDot) connDot.classList.remove("on");
+    if(connText) connText.textContent = "Terputus";
+    if(dbStatusText) {
+      dbStatusText.textContent = "Disconnected";
+      dbStatusText.style.color = "#bf4350";
+    }
   }
 });
 
-// --- 5. MONITORING REAL-TIME (NODE /history DATA TERAKHIR) ---
+// =========================================================
+// 4. MONITORING REAL-TIME DASHBOARD
+// =========================================================
 const historyRef = db.ref('history');
 historyRef.limitToLast(1).on('child_added', (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
-  document.getElementById('valSuhu').textContent = Math.round(data.suhu ?? 0);
-  document.getElementById('valKelembapan').textContent = Math.round(data.kelembapan ?? 0);
-  document.getElementById('valAngin').textContent = Math.round(data.kecepatan_angin ?? 0);
-  document.getElementById('valCahaya').textContent = Math.round(data.cahaya_lux ?? 0);
-  document.getElementById('valHujan').textContent = Math.round(data.curah_hujan ?? 0);
-  document.getElementById('lastUpdate').textContent = data.timestamp || new Date().toLocaleTimeString('id-ID');
+  if(document.getElementById('valSuhu')) document.getElementById('valSuhu').textContent = Math.round(data.suhu ?? 0);
+  if(document.getElementById('valKelembapan')) document.getElementById('valKelembapan').textContent = Math.round(data.kelembapan ?? 0);
+  if(document.getElementById('valAngin')) document.getElementById('valAngin').textContent = Math.round(data.kecepatan_angin ?? 0);
+  if(document.getElementById('valCahaya')) document.getElementById('valCahaya').textContent = Math.round(data.cahaya_lux ?? 0);
+  if(document.getElementById('valHujan')) document.getElementById('valHujan').textContent = Math.round(data.curah_hujan ?? 0);
+  if(document.getElementById('lastUpdate')) document.getElementById('lastUpdate').textContent = data.timestamp || new Date().toLocaleTimeString('id-ID');
 });
 
-
-// --- 6. LOAD HISTORI TABEL & GRAFIK ---
+// =========================================================
+// 5. LOAD HISTORI TABEL & RENDER GRAFIK
+// =========================================================
 historyRef.limitToLast(20).on('value', (snapshot) => {
   const dataObj = snapshot.val();
   const tableBody = document.getElementById('tableBody');
   
   if (!dataObj) {
-    tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Belum ada data histori.</td></tr>';
+    if(tableBody) tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Belum ada data histori.</td></tr>';
     globalHistoryData = [];
     return;
   }
 
   const items = Object.values(dataObj);
-  globalHistoryData = items.slice().reverse(); // Simpan untuk file CSV (terbaru di atas)
+  globalHistoryData = items.slice().reverse(); // Urutan terbaru di atas
   
-  tableBody.innerHTML = '';
-  globalHistoryData.forEach((item, index) => {
-    const row = `
-      <tr>
-        <td>${index + 1}</td>
-        <td>${item.timestamp || '-'}</td>
-        <td>${Math.round(item.suhu ?? 0)} °C</td>
-        <td>${Math.round(item.kelembapan ?? 0)} %</td>
-        <td>${Math.round(item.kecepatan_angin ?? 0)} m/s</td>
-        <td>${Math.round(item.cahaya_lux ?? 0)} Lux</td>
-        <td>${Math.round(item.curah_hujan ?? 0)}</td>
-      </tr>
-    `;
-    tableBody.innerHTML += row;
-  });
+  if(tableBody) {
+    tableBody.innerHTML = '';
+    globalHistoryData.forEach((item, index) => {
+      const row = `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.timestamp || '-'}</td>
+          <td>${Math.round(item.suhu ?? 0)} °C</td>
+          <td>${Math.round(item.kelembapan ?? 0)} %</td>
+          <td>${Math.round(item.kecepatan_angin ?? 0)} m/s</td>
+          <td>${Math.round(item.cahaya_lux ?? 0)} Lux</td>
+          <td>${Math.round(item.curah_hujan ?? 0)}</td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+  }
 
-  // Render 5 Grafik
+  // Panggil fungsi render grafik
   renderCharts(items);
 });
 
-// --- 7. LOGIKA UNDUH CSV ---
-document.getElementById('btnDownloadCSV').addEventListener('click', () => {
-  if (globalHistoryData.length === 0) {
-    alert("Belum ada data histori untuk diunduh.");
-    return;
-  }
-
-  let csvContent = "data:text/csv;charset=utf-8,";
-  csvContent += "No,Waktu,Suhu (*C),Kelembapan (%),Kecepatan Angin (m/s),Cahaya (Lux),Curah Hujan (mm)\n";
-
-  globalHistoryData.forEach((row, index) => {
-    let barisData = [
-      index + 1,
-      row.timestamp || '-',
-      Math.round(row.suhu ?? 0),
-      Math.round(row.kelembapan ?? 0),
-      Math.round(row.kecepatan_angin ?? 0),
-      Math.round(row.cahaya_lux ?? 0),
-      Math.round(row.curah_hujan ?? 0)
-    ];
-    csvContent += barisData.join(",") + "\n";
-  });
-
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "Histori_Sistem_Energi.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-});
-
-// --- 8. INISIALISASI 5 CHART.JS ---
+// =========================================================
+// 6. FUNGSI RENDER CHART.JS
+// =========================================================
 function renderCharts(dataItems) {
+  // Hanya jalankan jika elemen canvas tersedia
+  if(!document.getElementById('chartSuhu')) return;
+
   const labels = dataItems.map(d => (d.timestamp ? d.timestamp.split(' ')[1] || d.timestamp : '-'));
-  
   const dataSuhu = dataItems.map(d => Math.round(d.suhu ?? 0));
   const dataKelembapan = dataItems.map(d => Math.round(d.kelembapan ?? 0));
   const dataCahaya = dataItems.map(d => Math.round(d.cahaya_lux ?? 0));
@@ -407,3 +401,69 @@ function renderCharts(dataItems) {
     type: 'line',
     data: { labels: labels, datasets: [{ label: 'Suhu (°C)', data: dataSuhu, borderColor: '#ef5663', backgroundColor: 'rgba(239, 86, 99, 0.1)', tension: 0.3, fill: true }] },
     options: chartOptions
+  });
+
+  cKelembapan = new Chart(document.getElementById('chartKelembapan').getContext('2d'), {
+    type: 'line',
+    data: { labels: labels, datasets: [{ label: 'Kelembapan (%)', data: dataKelembapan, borderColor: '#20c77b', backgroundColor: 'rgba(32, 199, 123, 0.1)', tension: 0.3, fill: true }] },
+    options: chartOptions
+  });
+
+  cCahaya = new Chart(document.getElementById('chartCahaya').getContext('2d'), {
+    type: 'line',
+    data: { labels: labels, datasets: [{ label: 'Cahaya (Lux)', data: dataCahaya, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true }] },
+    options: chartOptions
+  });
+
+  cAngin = new Chart(document.getElementById('chartAngin').getContext('2d'), {
+    type: 'line',
+    data: { labels: labels, datasets: [{ label: 'Angin (m/s)', data: dataAngin, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: true }] },
+    options: chartOptions
+  });
+
+  cHujan = new Chart(document.getElementById('chartHujan').getContext('2d'), {
+    type: 'bar', 
+    data: { labels: labels, datasets: [{ label: 'Curah Hujan (mm)', data: dataHujan, backgroundColor: '#8b5cf6' }] },
+    options: chartOptions
+  });
+}
+
+// =========================================================
+// 7. LOGIKA UNDUH FILE CSV
+// =========================================================
+const btnDownloadCSV = document.getElementById('btnDownloadCSV');
+if(btnDownloadCSV) {
+  btnDownloadCSV.addEventListener('click', () => {
+    if (globalHistoryData.length === 0) {
+      alert("Belum ada data histori untuk diunduh.");
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "No,Waktu,Suhu (*C),Kelembapan (%),Kecepatan Angin (m/s),Cahaya (Lux),Curah Hujan (mm)\n";
+
+    globalHistoryData.forEach((row, index) => {
+      let barisData = [
+        index + 1,
+        row.timestamp || '-',
+        Math.round(row.suhu ?? 0),
+        Math.round(row.kelembapan ?? 0),
+        Math.round(row.kecepatan_angin ?? 0),
+        Math.round(row.cahaya_lux ?? 0),
+        Math.round(row.curah_hujan ?? 0)
+      ];
+      csvContent += barisData.join(",") + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Histori_Sistem_Energi.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+</script>
+</body>
+</html>
