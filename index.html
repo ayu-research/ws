@@ -10,7 +10,6 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#1
 .app{display:flex;min-height:100vh}
 .side{width:245px;background:#101827;color:#dce5f2;padding:22px 15px;position:fixed;top:0;bottom:0}
 .brand{display:flex;gap:11px;align-items:center;padding:5px 10px 28px}
-/* Penyesuaian Logo Sidebar */
 .brand img{width:45px;height:45px;border-radius:50%;object-fit:cover;background:#fff;border:2px solid #25344b;}
 .brand b{display:block;color:#fff;font-size:17px}.brand small{color:#8fa1b8}
 .nav{position:relative;z-index:10}
@@ -23,7 +22,6 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#1
 main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 .top{height:88px;border-bottom:1px solid #e3e8ef;display:flex;justify-content:space-between;align-items:center}
 .title-wrap{display:flex;align-items:center;gap:14px}
-/* Penyesuaian Logo Header */
 .site-logo{width:54px;height:54px;object-fit:cover;border-radius:50%;background:white;border:2px solid #e5eaf0;}
 .top h1{font-size:23px;margin:4px 0}
 .eyebrow{font-size:10px;letter-spacing:1.5px;color:#8794a7;font-weight:bold}
@@ -41,19 +39,13 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 .label{font-size:12px;color:#738196;font-weight:bold}
 .value{font-size:26px;font-weight:800;margin-top:15px}
 .unit{font-size:12px;color:#8491a3;font-weight:normal}
-.cols{display:grid;grid-template-columns:1.4fr 1fr;gap:15px;margin-top:15px}
+.cols{display:grid;grid-template-columns:1fr;gap:15px;margin-top:15px}
 .panel{padding:20px}
 .panel h3{margin:0;font-size:15px}
 .panel p{font-size:12px;color:#8491a3}
-.relay{display:flex;align-items:center;gap:15px;padding-top:15px}
-.lamp{font-size:35px}
-.state{margin-left:auto;padding:7px 10px;border-radius:20px;font-size:10px;font-weight:bold}
-.state.on{background:#e9fbf2;color:#16804e}
-.state.off{background:#fbecee;color:#b93c4a}
 .status div{display:flex;justify-content:space-between;border-bottom:1px solid #edf1f5;padding:12px 0;font-size:12px}
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:15px}
 .chart{background:white;border:1px solid #e3e8ef;border-radius:14px;padding:15px;box-shadow:0 5px 20px rgba(20,35,60,.04)}
-/* Khusus chart ke-5 agar berada di tengah/penuh */
 .chart.full{grid-column:1/-1} 
 .chart canvas{width:100%!important;height:250px!important}
 .table-wrap{overflow:auto;background:white;border-radius:14px;border:1px solid #e3e8ef}
@@ -83,7 +75,6 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 <div class="app">
   <aside class="side">
     <div class="brand">
-      <!-- MENGGUNAKAN NAMA FILE: logo.jpg -->
       <img src="logo.jpg" alt="Logo">
       <div><b>Monitoring</b><small>Energi Terbarukan</small></div>
     </div>
@@ -102,7 +93,6 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
   <main>
     <header class="top">
       <div class="title-wrap">
-        <!-- MENGGUNAKAN NAMA FILE: logo.jpg -->
         <img class="site-logo" src="logo.jpg" alt="Logo Institusi">
         <div>
           <span class="eyebrow">STASIUN MONITORING</span>
@@ -146,22 +136,6 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
       </div>
 
       <div class="cols">
-        <div class="panel">
-          <h3>Kontrol Relai Utama</h3>
-          <p>Aktifkan atau nonaktifkan beban eksternal melalui Firebase.</p>
-          <div class="relay">
-            <div class="lamp" id="lampIcon">💡</div>
-            <div>
-              <strong id="relayText">Relay OFF</strong>
-              <div style="font-size: 11px; color: #8491a3; margin-top: 3px;">Node: /control/relay</div>
-            </div>
-            <span id="relayBadge" class="state off">OFF</span>
-          </div>
-          <div style="margin-top: 20px;">
-            <button class="btn" id="btnToggleRelay">Beralih Status Relay</button>
-          </div>
-        </div>
-
         <div class="panel">
           <h3>Informasi Sistem</h3>
           <div class="status">
@@ -210,7 +184,6 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
           <h2>Histori Pengukuran</h2>
           <p>Log catatan data sensor yang tersimpan di Firebase Realtime Database.</p>
         </div>
-        <!-- Tombol Download CSV -->
         <button class="btn btn-success" id="btnDownloadCSV">
           <span>📥</span> Unduh Data (CSV)
         </button>
@@ -274,7 +247,6 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // State Variabel
-let currentRelayState = false;
 let globalHistoryData = []; // Untuk simpan data CSV
 let cSuhu, cKelembapan, cCahaya, cAngin, cHujan; // Objek Chart 1-5
 
@@ -346,35 +318,8 @@ historyRef.limitToLast(1).on('child_added', (snapshot) => {
   document.getElementById('lastUpdate').textContent = data.timestamp || new Date().toLocaleTimeString('id-ID');
 });
 
-// --- 6. KONTROL RELAY ---
-const relayRef = db.ref('control/relay');
-relayRef.on('value', (snapshot) => {
-  const val = snapshot.val();
-  currentRelayState = (val === true || val === 1 || val === "ON" || val === "1");
 
-  const badge = document.getElementById('relayBadge');
-  const text = document.getElementById('relayText');
-  const lamp = document.getElementById('lampIcon');
-
-  if (currentRelayState) {
-    badge.className = 'state on';
-    badge.textContent = 'ON';
-    text.textContent = 'Relay ON (Aktif)';
-    lamp.style.filter = 'drop-shadow(0 0 10px #f59e0b)';
-  } else {
-    badge.className = 'state off';
-    badge.textContent = 'OFF';
-    text.textContent = 'Relay OFF (Mati)';
-    lamp.style.filter = 'none';
-  }
-});
-
-document.getElementById('btnToggleRelay').addEventListener('click', () => {
-  const newState = !currentRelayState;
-  relayRef.set(newState).catch(err => alert("Gagal memperbarui relay: " + err.message));
-});
-
-// --- 7. LOAD HISTORI TABEL & GRAFIK ---
+// --- 6. LOAD HISTORI TABEL & GRAFIK ---
 historyRef.limitToLast(20).on('value', (snapshot) => {
   const dataObj = snapshot.val();
   const tableBody = document.getElementById('tableBody');
@@ -408,7 +353,7 @@ historyRef.limitToLast(20).on('value', (snapshot) => {
   renderCharts(items);
 });
 
-// --- 8. LOGIKA UNDUH CSV ---
+// --- 7. LOGIKA UNDUH CSV ---
 document.getElementById('btnDownloadCSV').addEventListener('click', () => {
   if (globalHistoryData.length === 0) {
     alert("Belum ada data histori untuk diunduh.");
@@ -440,7 +385,7 @@ document.getElementById('btnDownloadCSV').addEventListener('click', () => {
   document.body.removeChild(link);
 });
 
-// --- 9. INISIALISASI 5 CHART.JS ---
+// --- 8. INISIALISASI 5 CHART.JS ---
 function renderCharts(dataItems) {
   const labels = dataItems.map(d => (d.timestamp ? d.timestamp.split(' ')[1] || d.timestamp : '-'));
   
@@ -462,32 +407,3 @@ function renderCharts(dataItems) {
     type: 'line',
     data: { labels: labels, datasets: [{ label: 'Suhu (°C)', data: dataSuhu, borderColor: '#ef5663', backgroundColor: 'rgba(239, 86, 99, 0.1)', tension: 0.3, fill: true }] },
     options: chartOptions
-  });
-
-  cKelembapan = new Chart(document.getElementById('chartKelembapan').getContext('2d'), {
-    type: 'line',
-    data: { labels: labels, datasets: [{ label: 'Kelembapan (%)', data: dataKelembapan, borderColor: '#20c77b', backgroundColor: 'rgba(32, 199, 123, 0.1)', tension: 0.3, fill: true }] },
-    options: chartOptions
-  });
-
-  cCahaya = new Chart(document.getElementById('chartCahaya').getContext('2d'), {
-    type: 'line',
-    data: { labels: labels, datasets: [{ label: 'Cahaya (Lux)', data: dataCahaya, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true }] },
-    options: chartOptions
-  });
-
-  cAngin = new Chart(document.getElementById('chartAngin').getContext('2d'), {
-    type: 'line',
-    data: { labels: labels, datasets: [{ label: 'Angin (m/s)', data: dataAngin, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: true }] },
-    options: chartOptions
-  });
-
-  cHujan = new Chart(document.getElementById('chartHujan').getContext('2d'), {
-    type: 'bar', 
-    data: { labels: labels, datasets: [{ label: 'Curah Hujan (mm)', data: dataHujan, backgroundColor: '#8b5cf6' }] },
-    options: chartOptions
-  });
-}
-</script>
-</body>
-</html>
