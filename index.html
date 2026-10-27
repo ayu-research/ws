@@ -1,514 +1,659 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Monitoring Energi Terbarukan</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#172033}
-.app{display:flex;min-height:100vh}
-.side{width:245px;background:#101827;color:#dce5f2;padding:22px 15px;position:fixed;top:0;bottom:0}
-.brand{display:flex;gap:11px;align-items:center;padding:5px 10px 28px}
-.brand img{width:45px;height:45px;border-radius:50%;object-fit:cover;background:#fff;border:2px solid #25344b;}
-.brand b{display:block;color:#fff;font-size:17px}.brand small{color:#8fa1b8}
-.nav{position:relative;z-index:10}
-.nav a{display:block;color:#9eacc0;text-decoration:none;padding:12px 13px;border-radius:9px;margin:4px 0;font-weight:bold;cursor:pointer;user-select:none}
-.nav a.active,.nav a:hover{background:#25344b;color:white}
-.nav a:active{transform:scale(.98)}
-.foot{position:absolute;bottom:20px;left:25px;right:15px;font-size:11px;color:#8090a7}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef5663;margin-right:6px}
-.dot.on{background:#20c77b}
-main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
-.top{height:88px;border-bottom:1px solid #e3e8ef;display:flex;justify-content:space-between;align-items:center}
-.title-wrap{display:flex;align-items:center;gap:14px}
-.site-logo{width:54px;height:54px;object-fit:cover;border-radius:50%;background:white;border:2px solid #e5eaf0;}
-.top h1{font-size:23px;margin:4px 0}
-.eyebrow{font-size:10px;letter-spacing:1.5px;color:#8794a7;font-weight:bold}
-.clock{text-align:right;font-size:12px;color:#68778c}
-.clock strong{font-size:17px;color:#172033;display:block}
-.page{display:none;padding-top:25px}
-.page.active{display:block}
-.intro{margin-bottom:20px}
-.intro h2{margin:0 0 5px;font-size:20px}
-.intro p{margin:0;color:#7d8a9c;font-size:13px}
-.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
-.card,.panel{background:white;border:1px solid #e3e8ef;border-radius:14px;box-shadow:0 5px 20px rgba(20,35,60,.04)}
-.card{padding:17px;cursor:pointer;transition:transform 0.2s}
-.card:hover{transform:translateY(-2px)}
-.label{font-size:12px;color:#738196;font-weight:bold}
-.value{font-size:26px;font-weight:800;margin-top:15px}
-.unit{font-size:12px;color:#8491a3;font-weight:normal}
-.cols{display:grid;grid-template-columns:1fr;gap:15px;margin-top:15px}
-.panel{padding:20px}
-.panel h3{margin:0;font-size:15px}
-.panel p{font-size:12px;color:#8491a3}
-.status div{display:flex;justify-content:space-between;border-bottom:1px solid #edf1f5;padding:12px 0;font-size:12px}
-.charts{display:grid;grid-template-columns:1fr 1fr;gap:15px}
-.chart{background:white;border:1px solid #e3e8ef;border-radius:14px;padding:15px;box-shadow:0 5px 20px rgba(20,35,60,.04)}
-.chart.full{grid-column:1/-1} 
-.chart canvas{width:100%!important;height:250px!important}
-.table-wrap{overflow:auto;background:white;border-radius:14px;border:1px solid #e3e8ef}
-.table{width:100%;border-collapse:collapse;font-size:12px}
-.table th,.table td{padding:12px;border-bottom:1px solid #edf1f5;text-align:left;white-space:nowrap}
-.table th{background:#f8fafc;color:#6f7d90}
-.btn{border:0;background:#172238;color:white;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
-.btn:hover{background:#25344b}
-.btn-success{background:#16804e;}
-.btn-success:hover{background:#0f5e38;}
-
-/* Style khusus untuk Filter Waktu */
-.filter-wrap {display:flex; align-items:center; gap:10px;}
-.filter-wrap label {font-size: 13px; font-weight: bold; color: #6f7d90;}
-.filter-wrap select {padding: 8px 12px; border-radius: 8px; border: 1px solid #dce3eb; outline: none; font-family: inherit; font-weight: bold; color: #172033; background: #fff;}
-
-@media(max-width:1050px){.cards{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:800px){
-  .side{width:65px;padding:15px 7px}
-  .brand div:not(.logo),.nav span,.foot{display:none}
-  main{margin-left:65px;width:calc(100% - 65px);padding:0 15px}
-  .cards,.cols,.charts{grid-template-columns:1fr}
-  .chart.full{grid-column:auto}
-  .top{height:auto;padding:15px 0}
-  .clock{display:none}
-  .intro{flex-direction:column; align-items:flex-start; gap:10px;}
-}
-@media(max-width:500px){.cards{grid-template-columns:1fr}}
-</style>
-
-<!-- Firebase App & Database -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-<div class="app">
-  <aside class="side">
-    <div class="brand">
-      <img src="logo.jpg" alt="Logo">
-      <div><b>Monitoring</b><small>Energi Terbarukan</small></div>
-    </div>
-    <nav class="nav">
-      <a data-page="dashboard" class="active">⌂ <span>Dashboard</span></a>
-      <a data-page="grafik">◒ <span>Grafik</span></a>
-      <a data-page="histori">◷ <span>Histori</span></a>
-    </nav>
-    <div class="foot">
-      <span id="connDot" class="dot"></span>
-      <span id="conn">Menghubungkan...</span><br>Firebase Realtime Database
-    </div>
-  </aside>
-
-  <main>
-    <header class="top">
-      <div class="title-wrap">
-        <img class="site-logo" src="logo.jpg" alt="Logo Institusi">
-        <div>
-          <span class="eyebrow">STASIUN MONITORING</span>
-          <h1>Sistem Energi Terbarukan</h1>
-        </div>
-      </div>
-      <div class="clock">
-        <span id="liveClockDate">-</span>
-        <strong id="liveClockTime">00:00:00 WIB</strong>
-      </div>
-    </header>
-
-    <!-- PAGE 1: DASHBOARD -->
-    <section id="dashboard" class="page active">
-      <div class="intro">
-        <h2>Ringkasan Real-Time</h2>
-        <p>Parameter sensor lingkungan dan status sistem terhubung secara live.</p>
-      </div>
-
-      <div class="cards">
-        <div class="card">
-          <div class="label">SUHU</div>
-          <div class="value"><span id="valSuhu">0</span> <span class="unit">°C</span></div>
-        </div>
-        <div class="card">
-          <div class="label">KELEMBAPAN</div>
-          <div class="value"><span id="valKelembapan">0</span> <span class="unit">%</span></div>
-        </div>
-        <div class="card">
-          <div class="label">KECEPATAN ANGIN</div>
-          <div class="value"><span id="valAngin">0</span> <span class="unit">m/s</span></div>
-        </div>
-        <div class="card">
-          <div class="label">INTENSITAS CAHAYA</div>
-          <div class="value"><span id="valCahaya">0</span> <span class="unit">Lux</span></div>
-        </div>
-        <div class="card">
-          <div class="label">CURAH HUJAN</div>
-          <div class="value"><span id="valHujan">0</span> <span class="unit">mm</span></div>
-        </div>
-      </div>
-
-      <div class="cols">
-        <div class="panel">
-          <h3>Informasi Sistem</h3>
-          <div class="status">
-            <div><span>Pembaruan Terakhir:</span> <strong id="lastUpdate">-</strong></div>
-            <div><span>Status Database:</span> <strong id="dbStatusText" style="color: #bf4350;">Disconnected</strong></div>
-            <div><span>Lokasi Node:</span> <strong>/history</strong></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- PAGE 2: GRAFIK (5 GRAFIK) dengan FILTER -->
-    <section id="grafik" class="page">
-      <div class="intro" style="display:flex; justify-content:space-between; align-items:flex-end;">
-        <div>
-          <h2>Grafik Tren Parameter</h2>
-          <p>Visualisasi histori (Rata-rata/Realtime) yang akan terus diakumulasi.</p>
-        </div>
-        <div class="filter-wrap">
-          <label>Tampilkan Filter:</label>
-          <select id="timeFilter">
-            <option value="menit">Per Menit (Realtime)</option>
-            <option value="jam">Per Jam (Rata-rata)</option>
-            <option value="hari">Per Hari (Rata-rata)</option>
-            <option value="bulan">Per Bulan (Rata-rata)</option>
-          </select>
-        </div>
-      </div>
-      <div class="charts">
-        <div class="chart">
-          <h3>Suhu (°C)</h3>
-          <canvas id="chartSuhu"></canvas>
-        </div>
-        <div class="chart">
-          <h3>Kelembapan (%)</h3>
-          <canvas id="chartKelembapan"></canvas>
-        </div>
-        <div class="chart">
-          <h3>Intensitas Cahaya (Lux)</h3>
-          <canvas id="chartCahaya"></canvas>
-        </div>
-        <div class="chart">
-          <h3>Kecepatan Angin (m/s)</h3>
-          <canvas id="chartAngin"></canvas>
-        </div>
-        <div class="chart full">
-          <h3>Curah Hujan (mm)</h3>
-          <canvas id="chartHujan"></canvas>
-        </div>
-      </div>
-    </section>
-
-    <!-- PAGE 3: HISTORI & DOWNLOAD CSV -->
-    <section id="histori" class="page">
-      <div class="intro" style="display:flex; justify-content:space-between; align-items:flex-end;">
-        <div>
-          <h2>Histori Pengukuran</h2>
-          <p>Log catatan data sensor yang tersimpan di Firebase Realtime Database.</p>
-        </div>
-        <button class="btn btn-success" id="btnDownloadCSV">
-          <span>📥</span> Unduh Data (CSV)
-        </button>
-      </div>
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>No</th>
-              <th>Waktu (Timestamp)</th>
-              <th>Suhu (°C)</th>
-              <th>Kelembapan (%)</th>
-              <th>Angin (m/s)</th>
-              <th>Cahaya (Lux)</th>
-              <th>Curah Hujan</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody">
-            <!-- Data tabel dimasukkan oleh JavaScript -->
-          </tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-</div>
-
-<script>
-// =========================================================
-// 1. LOGIKA NAVIGASI MENU
-// =========================================================
-let cSuhu, cKelembapan, cCahaya, cAngin, cHujan;
-const navLinks = document.querySelectorAll('.nav a');
-const pages = document.querySelectorAll('.page');
-
-navLinks.forEach(link => {
-  link.addEventListener('click', function(e) {
-    e.preventDefault();
-    const targetPage = this.getAttribute('data-page');
-
-    navLinks.forEach(l => l.classList.remove('active'));
-    pages.forEach(p => p.classList.remove('active'));
-
-    this.classList.add('active');
-    const targetElement = document.getElementById(targetPage);
-    if(targetElement) targetElement.classList.add('active');
-
-    if(targetPage === 'grafik') {
-      try {
-        if(cSuhu) cSuhu.resize();
-        if(cKelembapan) cKelembapan.resize();
-        if(cCahaya) cCahaya.resize();
-        if(cAngin) cAngin.resize();
-        if(cHujan) cHujan.resize();
-      } catch (err) {}
-    }
-  });
-});
-
-// =========================================================
-// 2. JAM DIGITAL REALTIME
-// =========================================================
-function updateClock() {
-  const now = new Date();
-  const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  const dateEl = document.getElementById('liveClockDate');
-  const timeEl = document.getElementById('liveClockTime');
-  if(dateEl) dateEl.textContent = now.toLocaleDateString('id-ID', dateOptions);
-  if(timeEl) timeEl.textContent = now.toLocaleTimeString('id-ID') + ' WIB';
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-// =========================================================
-// 3. FIREBASE CONFIGURATION
-// =========================================================
-const firebaseConfig = {
-  databaseURL: "https://monitoring-energi-terbarukan-default-rtdb.asia-southeast1.firebasedatabase.app"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-let globalHistoryData = []; // Untuk CSV
-
-// Indikator Koneksi
-const connDot = document.getElementById('connDot');
-const connText = document.getElementById('conn');
-const dbStatusText = document.getElementById('dbStatusText');
-db.ref(".info/connected").on("value", (snap) => {
-  if (snap.val() === true) {
-    if(connDot) connDot.classList.add("on");
-    if(connText) connText.textContent = "Terhubung";
-    if(dbStatusText) { dbStatusText.textContent = "Connected"; dbStatusText.style.color = "#16804e"; }
-  } else {
-    if(connDot) connDot.classList.remove("on");
-    if(connText) connText.textContent = "Terputus";
-    if(dbStatusText) { dbStatusText.textContent = "Disconnected"; dbStatusText.style.color = "#bf4350"; }
-  }
-});
-
-// =========================================================
-// 4. MONITORING REAL-TIME DASHBOARD (1 DATA TERAKHIR)
-// =========================================================
-const historyRef = db.ref('history');
-historyRef.limitToLast(1).on('child_added', (snapshot) => {
-  const data = snapshot.val();
-  if (!data) return;
-  if(document.getElementById('valSuhu')) document.getElementById('valSuhu').textContent = Math.round(data.suhu ?? 0);
-  if(document.getElementById('valKelembapan')) document.getElementById('valKelembapan').textContent = Math.round(data.kelembapan ?? 0);
-  if(document.getElementById('valAngin')) document.getElementById('valAngin').textContent = Math.round(data.kecepatan_angin ?? 0);
-  if(document.getElementById('valCahaya')) document.getElementById('valCahaya').textContent = Math.round(data.cahaya_lux ?? 0);
-  if(document.getElementById('valHujan')) document.getElementById('valHujan').textContent = Math.round(data.curah_hujan ?? 0);
-  if(document.getElementById('lastUpdate')) document.getElementById('lastUpdate').textContent = data.timestamp || new Date().toLocaleTimeString('id-ID');
-});
-
-// =========================================================
-// 5. INISIALISASI GRAFIK KOSONG
-// =========================================================
-function initCharts() {
-  if(!document.getElementById('chartSuhu')) return;
-  const chartOptions = { responsive: true, maintainAspectRatio: false };
-
-  cSuhu = new Chart(document.getElementById('chartSuhu').getContext('2d'), {
-    type: 'line', data: { labels: [], datasets: [{ label: 'Suhu (°C)', data: [], borderColor: '#ef5663', backgroundColor: 'rgba(239, 86, 99, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
-  });
-  cKelembapan = new Chart(document.getElementById('chartKelembapan').getContext('2d'), {
-    type: 'line', data: { labels: [], datasets: [{ label: 'Kelembapan (%)', data: [], borderColor: '#20c77b', backgroundColor: 'rgba(32, 199, 123, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
-  });
-  cCahaya = new Chart(document.getElementById('chartCahaya').getContext('2d'), {
-    type: 'line', data: { labels: [], datasets: [{ label: 'Cahaya (Lux)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
-  });
-  cAngin = new Chart(document.getElementById('chartAngin').getContext('2d'), {
-    type: 'line', data: { labels: [], datasets: [{ label: 'Angin (m/s)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
-  });
-  cHujan = new Chart(document.getElementById('chartHujan').getContext('2d'), {
-    type: 'bar', data: { labels: [], datasets: [{ label: 'Curah Hujan (mm)', data: [], backgroundColor: '#8b5cf6' }] }, options: chartOptions
-  });
-}
-initCharts();
-
-// =========================================================
-// 6. LOGIKA FETCH DATA & PENGELOMPOKAN (FILTERING) GRAFIK
-// =========================================================
-let rawDataArray = []; // Menyimpan SELURUH data yang masuk tanpa terhapus
-let drawChartTimeout;
-let tableIndex = 0;
-const tableBody = document.getElementById('tableBody');
-if (tableBody) tableBody.innerHTML = '';
-
-// Event ketika pilihan filter waktu diganti
-document.getElementById('timeFilter').addEventListener('change', () => {
-  processDataForChart(); // Hitung ulang array data untuk dirender ke grafik
-});
-
-// Ambil 1000 data masa lalu agar bisa dikelompokkan ke Jam/Hari/Bulan
-historyRef.limitToLast(1000).on('child_added', (snapshot) => {
-  const item = snapshot.val();
-  if (!item) return;
-
-  // 1. Simpan selalu ke dalam array (Data terus terakumulasi)
-  rawDataArray.push(item);
-  globalHistoryData.unshift(item); // Untuk CSV
-  tableIndex++;
-
-  // 2. Tampilkan di Tabel
-  const row = `
-    <tr>
-      <td>${tableIndex}</td>
-      <td>${item.timestamp || '-'}</td>
-      <td>${Math.round(item.suhu ?? 0)} °C</td>
-      <td>${Math.round(item.kelembapan ?? 0)} %</td>
-      <td>${Math.round(item.kecepatan_angin ?? 0)} m/s</td>
-      <td>${Math.round(item.cahaya_lux ?? 0)} Lux</td>
-      <td>${Math.round(item.curah_hujan ?? 0)}</td>
-    </tr>
-  `;
-  if(tableBody) {
-    tableBody.insertAdjacentHTML('afterbegin', row);
-  }
-
-  // 3. Render ulang grafik menggunakan sistem DEBOUNCE
-  // Agar browser tidak lag saat pertama kali load data yang banyak.
-  clearTimeout(drawChartTimeout);
-  drawChartTimeout = setTimeout(() => {
-    processDataForChart();
-  }, 300);
-});
-
-// FUNGSI UTAMA: Mengelompokkan data berdasarkan Menit/Jam/Hari/Bulan
-function processDataForChart() {
-  const filter = document.getElementById('timeFilter').value;
-  const grouped = {};
-
-  rawDataArray.forEach(item => {
-    if (!item.timestamp) return;
-    
-    // Pecah format "YYYY-MM-DD HH:mm:ss"
-    let parts = item.timestamp.split(' ');
-    let datePart = parts[0] || ""; 
-    let timePart = parts[1] || "00:00:00"; 
-    
-    let key = item.timestamp; // Default fallback
-
-    // Menentukan pengelompokan berdasarkan filter
-    if (filter === 'menit') {
-      key = datePart + ' ' + timePart.substring(0, 5); // Format: YYYY-MM-DD HH:mm
-    } else if (filter === 'jam') {
-      key = datePart + ' ' + timePart.substring(0, 2) + ':00'; // Format: YYYY-MM-DD HH:00
-    } else if (filter === 'hari') {
-      key = datePart; // Format: YYYY-MM-DD
-    } else if (filter === 'bulan') {
-      let dParts = datePart.split(/[-/]/);
-      if (dParts.length === 3) {
-        if (dParts[0].length === 4) {
-          key = dParts[0] + '-' + dParts[1]; // Format YYYY-MM
-        } else {
-          key = dParts[2] + '-' + dParts[1]; // Format DD-MM-YYYY -> YYYY-MM
-        }
-      } else {
-        key = datePart;
-      }
-    }
-
-    // Hitung akumulasi (Untuk dicari rata-ratanya nanti)
-    if (!grouped[key]) {
-      grouped[key] = { count: 0, suhu: 0, kelembapan: 0, angin: 0, cahaya: 0, hujan: 0 };
-    }
-    grouped[key].suhu += Number(item.suhu) || 0;
-    grouped[key].kelembapan += Number(item.kelembapan) || 0;
-    grouped[key].angin += Number(item.kecepatan_angin) || 0;
-    grouped[key].cahaya += Number(item.cahaya_lux) || 0;
-    grouped[key].hujan += Number(item.curah_hujan) || 0;
-    grouped[key].count += 1;
-  });
-
-  // Siapkan Array untuk diinject ke Chart.js
-  const labels = [];
-  const dataSuhu = [];
-  const dataKelembapan = [];
-  const dataAngin = [];
-  const dataCahaya = [];
-  const dataHujan = [];
-
-  Object.keys(grouped).forEach(k => {
-    labels.push(k);
-    let g = grouped[k];
-    
-    // Dapatkan Nilai Rata-rata dari kelompok jam/hari/bulan
-    dataSuhu.push((g.suhu / g.count).toFixed(1));
-    dataKelembapan.push((g.kelembapan / g.count).toFixed(1));
-    dataAngin.push((g.angin / g.count).toFixed(1));
-    dataCahaya.push((g.cahaya / g.count).toFixed(1));
-    dataHujan.push((g.hujan / g.count).toFixed(1)); 
-  });
-
-  // Timpa (Update) grafik dengan susunan data baru yang sudah di-filter
-  updateChartData(cSuhu, labels, dataSuhu);
-  updateChartData(cKelembapan, labels, dataKelembapan);
-  updateChartData(cCahaya, labels, dataCahaya);
-  updateChartData(cAngin, labels, dataAngin);
-  updateChartData(cHujan, labels, dataHujan);
-}
-
-function updateChartData(chart, labels, data) {
-  if (!chart) return;
-  chart.data.labels = labels;
-  chart.data.datasets[0].data = data;
-  chart.update(); // Memicu re-render visual
-}
-
-// =========================================================
-// 7. LOGIKA UNDUH FILE CSV
-// =========================================================
-const btnDownloadCSV = document.getElementById('btnDownloadCSV');
-if(btnDownloadCSV) {
-  btnDownloadCSV.addEventListener('click', () => {
-    if (globalHistoryData.length === 0) {
-      alert("Belum ada data histori untuk diunduh.");
-      return;
-    }
-
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "No,Waktu,Suhu (*C),Kelembapan (%),Kecepatan Angin (m/s),Cahaya (Lux),Curah Hujan (mm)\n";
-
-    globalHistoryData.forEach((row, index) => {
-      let barisData = [
-        index + 1,
-        row.timestamp || '-',
-        Math.round(row.suhu ?? 0),
-        Math.round(row.kelembapan ?? 0),
-        Math.round(row.kecepatan_angin ?? 0),
-        Math.round(row.cahaya_lux ?? 0),
-        Math.round(row.curah_hujan ?? 0)
-      ];
-      csvContent += barisData.join(",") + "\n";
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "Histori_Sistem_Energi.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  });
-}
-</script>
-</body>
-</html>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoring Energi Terbarukan</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#172033}
+.app{display:flex;min-height:100vh}
+.side{width:245px;background:#101827;color:#dce5f2;padding:22px 15px;position:fixed;top:0;bottom:0}
+.brand{display:flex;gap:11px;align-items:center;padding:5px 10px 28px}
+.brand img{width:45px;height:45px;border-radius:50%;object-fit:cover;background:#fff;border:2px solid #25344b;}
+.brand b{display:block;color:#fff;font-size:17px}.brand small{color:#8fa1b8}
+.nav{position:relative;z-index:10}
+.nav a{display:block;color:#9eacc0;text-decoration:none;padding:12px 13px;border-radius:9px;margin:4px 0;font-weight:bold;cursor:pointer;user-select:none}
+.nav a.active,.nav a:hover{background:#25344b;color:white}
+.nav a:active{transform:scale(.98)}
+.foot{position:absolute;bottom:20px;left:25px;right:15px;font-size:11px;color:#8090a7}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef5663;margin-right:6px}
+.dot.on{background:#20c77b}
+main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
+.top{height:88px;border-bottom:1px solid #e3e8ef;display:flex;justify-content:space-between;align-items:center}
+.title-wrap{display:flex;align-items:center;gap:14px}
+.site-logo{width:54px;height:54px;object-fit:cover;border-radius:50%;background:white;border:2px solid #e5eaf0;}
+.top h1{font-size:23px;margin:4px 0}
+.eyebrow{font-size:10px;letter-spacing:1.5px;color:#8794a7;font-weight:bold}
+.clock{text-align:right;font-size:12px;color:#68778c}
+.clock strong{font-size:17px;color:#172033;display:block}
+.page{display:none;padding-top:25px}
+.page.active{display:block}
+.intro{margin-bottom:20px}
+.intro h2{margin:0 0 5px;font-size:20px}
+.intro p{margin:0;color:#7d8a9c;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.card,.panel{background:white;border:1px solid #e3e8ef;border-radius:14px;box-shadow:0 5px 20px rgba(20,35,60,.04)}
+.card{padding:17px;cursor:pointer;transition:transform 0.2s}
+.card:hover{transform:translateY(-2px)}
+.label{font-size:12px;color:#738196;font-weight:bold}
+.value{font-size:26px;font-weight:800;margin-top:15px}
+.unit{font-size:12px;color:#8491a3;font-weight:normal}
+.cols{display:grid;grid-template-columns:1fr;gap:15px;margin-top:15px}
+.panel{padding:20px}
+.panel h3{margin:0;font-size:15px}
+.panel p{font-size:12px;color:#8491a3}
+.status div{display:flex;justify-content:space-between;border-bottom:1px solid #edf1f5;padding:12px 0;font-size:12px}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.chart{background:white;border:1px solid #e3e8ef;border-radius:14px;padding:15px;box-shadow:0 5px 20px rgba(20,35,60,.04)}
+.chart.full{grid-column:1/-1} 
+.chart canvas{width:100%!important;height:250px!important}
+.table-wrap{overflow:auto;background:white;border-radius:14px;border:1px solid #e3e8ef}
+.table{width:100%;border-collapse:collapse;font-size:12px}
+.table th,.table td{padding:12px;border-bottom:1px solid #edf1f5;text-align:left;white-space:nowrap}
+.table th{background:#f8fafc;color:#6f7d90}
+.btn{border:0;background:#172238;color:white;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+.btn:hover{background:#25344b}
+.btn-success{background:#16804e;}
+.btn-success:hover{background:#0f5e38;}
+
+/* Style khusus untuk Filter Waktu */
+.filter-wrap {display:flex; align-items:center; gap:10px;}
+
+/* Badge & Indikator Status ESP32 */
+.top-right {display:flex; align-items:center; gap:14px;}
+.chip-esp {display:inline-flex; align-items:center; gap:8px; background:white; border:1px solid #e3e8ef; padding:7px 14px; border-radius:30px; font-size:12px; font-weight:bold; box-shadow:0 2px 8px rgba(20,35,60,0.04); white-space:nowrap;}
+.badge-status {display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:bold; letter-spacing:0.5px;}
+.badge-online {background:rgba(32,199,123,0.14); color:#16804e; border:1px solid rgba(32,199,123,0.3);}
+.badge-offline {background:rgba(239,86,99,0.14); color:#bf4350; border:1px solid rgba(239,86,99,0.3);}
+.badge-waiting {background:rgba(245,158,11,0.14); color:#b45309; border:1px solid rgba(245,158,11,0.3);}
+
+.pulse-dot {width:8px; height:8px; border-radius:50%; display:inline-block;}
+.badge-online .pulse-dot, #espHeaderDot.dot-online {background:#20c77b; box-shadow:0 0 0 0 rgba(32,199,123,0.7); animation:pulse-green 1.8s infinite;}
+.badge-offline .pulse-dot, #espHeaderDot.dot-offline {background:#ef5663; animation:none;}
+.badge-waiting .pulse-dot, #espHeaderDot.dot-waiting {background:#f59e0b; animation:none;}
+
+@keyframes pulse-green {
+  0% { transform:scale(0.95); box-shadow:0 0 0 0 rgba(32,199,123,0.7); }
+  70% { transform:scale(1); box-shadow:0 0 0 7px rgba(32,199,123,0); }
+  100% { transform:scale(0.95); box-shadow:0 0 0 0 rgba(32,199,123,0); }
+}
+.filter-wrap label {font-size: 13px; font-weight: bold; color: #6f7d90;}
+.filter-wrap select {padding: 8px 12px; border-radius: 8px; border: 1px solid #dce3eb; outline: none; font-family: inherit; font-weight: bold; color: #172033; background: #fff;}
+
+@media(max-width:1050px){.cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:800px){
+  .side{width:65px;padding:15px 7px}
+  .brand div:not(.logo),.nav span,.foot{display:none}
+  main{margin-left:65px;width:calc(100% - 65px);padding:0 15px}
+  .cards,.cols,.charts{grid-template-columns:1fr}
+  .chart.full{grid-column:auto}
+  .top{height:auto;padding:15px 0}
+  .clock{display:none}
+  .intro{flex-direction:column; align-items:flex-start; gap:10px;}
+}
+@media(max-width:500px){.cards{grid-template-columns:1fr}}
+</style>
+
+<!-- Firebase App & Database -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <img src="logo.jpg" alt="Logo">
+      <div><b>Monitoring</b><small>Energi Terbarukan</small></div>
+    </div>
+    <nav class="nav">
+      <a data-page="dashboard" class="active">⌂ <span>Dashboard</span></a>
+      <a data-page="grafik">◒ <span>Grafik</span></a>
+      <a data-page="histori">◷ <span>Histori</span></a>
+    </nav>
+    <div class="foot">
+      <span id="connDot" class="dot"></span>
+      <span id="conn">Menghubungkan...</span><br>Firebase Realtime Database
+    </div>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div class="title-wrap">
+        <img class="site-logo" src="logo.jpg" alt="Logo Institusi">
+        <div>
+          <span class="eyebrow">STASIUN MONITORING</span>
+          <h1>Sistem Energi Terbarukan</h1>
+        </div>
+      </div>
+      <div class="top-right">
+        <div id="espHeaderChip" class="chip-esp">
+          <span id="espHeaderDot" class="pulse-dot dot-waiting"></span>
+          <span id="espHeaderLabel">ESP32: Menghubungkan...</span>
+        </div>
+        <div class="clock">
+          <span id="liveClockDate">-</span>
+          <strong id="liveClockTime">00:00:00 WIB</strong>
+        </div>
+      </div>
+    </header>
+
+    <!-- PAGE 1: DASHBOARD -->
+    <section id="dashboard" class="page active">
+      <div class="intro">
+        <h2>Ringkasan Real-Time</h2>
+        <p>Parameter sensor lingkungan dan status sistem terhubung secara live.</p>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="label">SUHU</div>
+          <div class="value"><span id="valSuhu">0</span> <span class="unit">°C</span></div>
+        </div>
+        <div class="card">
+          <div class="label">KELEMBAPAN</div>
+          <div class="value"><span id="valKelembapan">0</span> <span class="unit">%</span></div>
+        </div>
+        <div class="card">
+          <div class="label">KECEPATAN ANGIN</div>
+          <div class="value"><span id="valAngin">0</span> <span class="unit">m/s</span></div>
+        </div>
+        <div class="card">
+          <div class="label">INTENSITAS CAHAYA</div>
+          <div class="value"><span id="valCahaya">0</span> <span class="unit">Lux</span></div>
+        </div>
+        <div class="card">
+          <div class="label">CURAH HUJAN</div>
+          <div class="value"><span id="valHujan">0</span> <span class="unit">mm</span></div>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <h3>Informasi Sistem</h3>
+          <div class="status">
+            <div>
+              <span>Status ESP32:</span>
+              <span id="espStatusBadge" class="badge-status badge-waiting">
+                <span class="pulse-dot"></span>
+                <span id="espStatusText">Memeriksa Alat...</span>
+              </span>
+            </div>
+            <div><span>Aktivitas Alat:</span> <strong id="espLastSeenText">Menunggu data pertama...</strong></div>
+            <div><span>Pembaruan Data:</span> <strong id="lastUpdate">-</strong></div>
+            <div><span>Interval Pengiriman:</span> <span>Setiap 60 Detik</span></div>
+            <div><span>Koneksi Database:</span> <strong id="dbStatusText" style="color: #bf4350;">Disconnected</strong></div>
+            <div><span>Lokasi Node:</span> <strong>/history</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 2: GRAFIK (5 GRAFIK) dengan FILTER -->
+    <section id="grafik" class="page">
+      <div class="intro" style="display:flex; justify-content:space-between; align-items:flex-end;">
+        <div>
+          <h2>Grafik Tren Parameter</h2>
+          <p>Visualisasi histori (Rata-rata/Realtime) yang akan terus diakumulasi.</p>
+        </div>
+        <div class="filter-wrap">
+          <label>Tampilkan Filter:</label>
+          <select id="timeFilter">
+            <option value="menit">Per Menit (Realtime)</option>
+            <option value="jam">Per Jam (Rata-rata)</option>
+            <option value="hari">Per Hari (Rata-rata)</option>
+            <option value="bulan">Per Bulan (Rata-rata)</option>
+          </select>
+        </div>
+      </div>
+      <div class="charts">
+        <div class="chart">
+          <h3>Suhu (°C)</h3>
+          <canvas id="chartSuhu"></canvas>
+        </div>
+        <div class="chart">
+          <h3>Kelembapan (%)</h3>
+          <canvas id="chartKelembapan"></canvas>
+        </div>
+        <div class="chart">
+          <h3>Intensitas Cahaya (Lux)</h3>
+          <canvas id="chartCahaya"></canvas>
+        </div>
+        <div class="chart">
+          <h3>Kecepatan Angin (m/s)</h3>
+          <canvas id="chartAngin"></canvas>
+        </div>
+        <div class="chart full">
+          <h3>Curah Hujan (mm)</h3>
+          <canvas id="chartHujan"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 3: HISTORI & DOWNLOAD CSV -->
+    <section id="histori" class="page">
+      <div class="intro" style="display:flex; justify-content:space-between; align-items:flex-end;">
+        <div>
+          <h2>Histori Pengukuran</h2>
+          <p>Log catatan data sensor yang tersimpan di Firebase Realtime Database.</p>
+        </div>
+        <button class="btn btn-success" id="btnDownloadCSV">
+          <span>📥</span> Unduh Data (CSV)
+        </button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Waktu (Timestamp)</th>
+              <th>Suhu (°C)</th>
+              <th>Kelembapan (%)</th>
+              <th>Angin (m/s)</th>
+              <th>Cahaya (Lux)</th>
+              <th>Curah Hujan</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <!-- Data tabel dimasukkan oleh JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// =========================================================
+// 1. LOGIKA NAVIGASI MENU
+// =========================================================
+let cSuhu, cKelembapan, cCahaya, cAngin, cHujan;
+const navLinks = document.querySelectorAll('.nav a');
+const pages = document.querySelectorAll('.page');
+
+navLinks.forEach(link => {
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    const targetPage = this.getAttribute('data-page');
+
+    navLinks.forEach(l => l.classList.remove('active'));
+    pages.forEach(p => p.classList.remove('active'));
+
+    this.classList.add('active');
+    const targetElement = document.getElementById(targetPage);
+    if(targetElement) targetElement.classList.add('active');
+
+    if(targetPage === 'grafik') {
+      try {
+        if(cSuhu) cSuhu.resize();
+        if(cKelembapan) cKelembapan.resize();
+        if(cCahaya) cCahaya.resize();
+        if(cAngin) cAngin.resize();
+        if(cHujan) cHujan.resize();
+      } catch (err) {}
+    }
+  });
+});
+
+// =========================================================
+// 2. JAM DIGITAL REALTIME
+// =========================================================
+function updateClock() {
+  const now = new Date();
+  const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const dateEl = document.getElementById('liveClockDate');
+  const timeEl = document.getElementById('liveClockTime');
+  if(dateEl) dateEl.textContent = now.toLocaleDateString('id-ID', dateOptions);
+  if(timeEl) timeEl.textContent = now.toLocaleTimeString('id-ID') + ' WIB';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// =========================================================
+// 3. FIREBASE CONFIGURATION
+// =========================================================
+const firebaseConfig = {
+  databaseURL: "https://monitoring-energi-terbarukan-default-rtdb.asia-southeast1.firebasedatabase.app"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+let globalHistoryData = []; // Untuk CSV
+
+// Indikator Koneksi
+const connDot = document.getElementById('connDot');
+const connText = document.getElementById('conn');
+const dbStatusText = document.getElementById('dbStatusText');
+db.ref(".info/connected").on("value", (snap) => {
+  if (snap.val() === true) {
+    if(connDot) connDot.classList.add("on");
+    if(connText) connText.textContent = "Terhubung";
+    if(dbStatusText) { dbStatusText.textContent = "Connected"; dbStatusText.style.color = "#16804e"; }
+  } else {
+    if(connDot) connDot.classList.remove("on");
+    if(connText) connText.textContent = "Terputus";
+    if(dbStatusText) { dbStatusText.textContent = "Disconnected"; dbStatusText.style.color = "#bf4350"; }
+  }
+});
+
+// =========================================================
+// 4. MONITORING REAL-TIME DASHBOARD (1 DATA TERAKHIR)
+// =========================================================
+// =========================================================
+// 3.1. WATCHDOG STATUS ESP32 (HEARTBEAT MONITOR)
+// =========================================================
+let lastEspDataTimestampMs = null;
+
+function parseTimestampToMs(tsStr) {
+  if (!tsStr || typeof tsStr !== 'string') return null;
+  // Format dari ESP32: "YYYY-MM-DD HH:mm:ss"
+  let parts = tsStr.trim().split(' ');
+  if (parts.length === 2) {
+    let d = parts[0].split(/[-/]/);
+    let t = parts[1].split(':');
+    if (d.length === 3 && t.length >= 2) {
+      let year = d[0].length === 4 ? parseInt(d[0], 10) : parseInt(d[2], 10);
+      let month = parseInt(d[1], 10) - 1;
+      let day = d[0].length === 4 ? parseInt(d[2], 10) : parseInt(d[0], 10);
+      let hour = parseInt(t[0], 10);
+      let minute = parseInt(t[1], 10);
+      let second = t.length >= 3 ? parseInt(t[2], 10) : 0;
+      let dateObj = new Date(year, month, day, hour, minute, second);
+      let timeVal = dateObj.getTime();
+      if (!isNaN(timeVal)) return timeVal;
+    }
+  }
+  return null;
+}
+
+function updateEspWatchdog() {
+  const badge = document.getElementById('espStatusBadge');
+  const statusText = document.getElementById('espStatusText');
+  const lastSeenEl = document.getElementById('espLastSeenText');
+  const chipDot = document.getElementById('espHeaderDot');
+  const chipLabel = document.getElementById('espHeaderLabel');
+
+  if (!lastEspDataTimestampMs) {
+    if (badge) { badge.className = "badge-status badge-waiting"; }
+    if (statusText) { statusText.textContent = "Menunggu Data"; }
+    if (lastSeenEl) { lastSeenEl.textContent = "Belum menerima data dari ESP32"; }
+    if (chipLabel) { chipLabel.textContent = "ESP32: Menunggu..."; }
+    if (chipDot) { chipDot.className = "pulse-dot dot-waiting"; }
+    return;
+  }
+
+  const now = Date.now();
+  const diffSec = Math.max(0, Math.round((now - lastEspDataTimestampMs) / 1000));
+
+  // ESP32 mengirim data setiap 60 detik (1 menit).
+  // Ambang batas: toleransi hingga 150 detik (2.5 menit).
+  const TIMEOUT_OFFLINE_SEC = 150;
+
+  if (diffSec <= TIMEOUT_OFFLINE_SEC) {
+    // ESP32 Status: ONLINE
+    if (badge) { badge.className = "badge-status badge-online"; }
+    if (statusText) { statusText.textContent = "ONLINE"; }
+    if (chipLabel) { chipLabel.textContent = "ESP32: Online"; }
+    if (chipDot) { chipDot.className = "pulse-dot dot-online"; }
+
+    let relStr = "";
+    if (diffSec < 5) {
+      relStr = "Baru saja aktif";
+    } else if (diffSec < 60) {
+      relStr = `${diffSec} dtk yang lalu`;
+    } else {
+      let m = Math.floor(diffSec / 60);
+      let s = diffSec % 60;
+      relStr = `${m} mnt ${s} dtk yang lalu`;
+    }
+    if (lastSeenEl) {
+      lastSeenEl.innerHTML = `<span style="color:#16804e; font-weight:bold;">● Aktif</span> (${relStr})`;
+    }
+  } else {
+    // ESP32 Status: OFFLINE
+    if (badge) { badge.className = "badge-status badge-offline"; }
+    if (statusText) { statusText.textContent = "OFFLINE"; }
+    if (chipLabel) { chipLabel.textContent = "ESP32: Terputus"; }
+    if (chipDot) { chipDot.className = "pulse-dot dot-offline"; }
+
+    let relStr = "";
+    if (diffSec < 3600) {
+      let m = Math.floor(diffSec / 60);
+      relStr = `${m} menit yang lalu`;
+    } else if (diffSec < 86400) {
+      let h = Math.floor(diffSec / 3600);
+      let m = Math.floor((diffSec % 3600) / 60);
+      relStr = `${h} jam ${m} mnt yang lalu`;
+    } else {
+      let d = Math.floor(diffSec / 86400);
+      relStr = `${d} hari yang lalu`;
+    }
+    if (lastSeenEl) {
+      lastSeenEl.innerHTML = `<span style="color:#bf4350; font-weight:bold;">● Terputus</span> (${relStr})`;
+    }
+  }
+}
+
+// Jalankan watchdog status ESP32 setiap 3 detik secara berkala
+setInterval(updateEspWatchdog, 3000);
+
+// =========================================================
+// 4. MONITORING REAL-TIME DASHBOARD (1 DATA TERAKHIR)
+// =========================================================
+const historyRef = db.ref('history');
+historyRef.limitToLast(1).on('child_added', (snapshot) => {
+  const data = snapshot.val();
+  if (!data) return;
+
+  // Catat heartbeat waktu data ESP32 masuk
+  let parsedMs = parseTimestampToMs(data.timestamp);
+  if (parsedMs && Math.abs(Date.now() - parsedMs) < 24 * 3600 * 1000) {
+    lastEspDataTimestampMs = parsedMs;
+  } else {
+    lastEspDataTimestampMs = Date.now();
+  }
+  updateEspWatchdog();
+
+  if(document.getElementById('valSuhu')) document.getElementById('valSuhu').textContent = Math.round(data.suhu ?? 0);
+  if(document.getElementById('valKelembapan')) document.getElementById('valKelembapan').textContent = Math.round(data.kelembapan ?? 0);
+  if(document.getElementById('valAngin')) document.getElementById('valAngin').textContent = Math.round(data.kecepatan_angin ?? 0);
+  if(document.getElementById('valCahaya')) document.getElementById('valCahaya').textContent = Math.round(data.cahaya_lux ?? 0);
+  if(document.getElementById('valHujan')) document.getElementById('valHujan').textContent = Math.round(data.curah_hujan ?? 0);
+  if(document.getElementById('lastUpdate')) document.getElementById('lastUpdate').textContent = data.timestamp || new Date().toLocaleTimeString('id-ID');
+});
+
+// =========================================================
+// 5. INISIALISASI GRAFIK KOSONG
+// =========================================================
+function initCharts() {
+  if(!document.getElementById('chartSuhu')) return;
+  const chartOptions = { responsive: true, maintainAspectRatio: false };
+
+  cSuhu = new Chart(document.getElementById('chartSuhu').getContext('2d'), {
+    type: 'line', data: { labels: [], datasets: [{ label: 'Suhu (°C)', data: [], borderColor: '#ef5663', backgroundColor: 'rgba(239, 86, 99, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
+  });
+  cKelembapan = new Chart(document.getElementById('chartKelembapan').getContext('2d'), {
+    type: 'line', data: { labels: [], datasets: [{ label: 'Kelembapan (%)', data: [], borderColor: '#20c77b', backgroundColor: 'rgba(32, 199, 123, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
+  });
+  cCahaya = new Chart(document.getElementById('chartCahaya').getContext('2d'), {
+    type: 'line', data: { labels: [], datasets: [{ label: 'Cahaya (Lux)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
+  });
+  cAngin = new Chart(document.getElementById('chartAngin').getContext('2d'), {
+    type: 'line', data: { labels: [], datasets: [{ label: 'Angin (m/s)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: true }] }, options: chartOptions
+  });
+  cHujan = new Chart(document.getElementById('chartHujan').getContext('2d'), {
+    type: 'bar', data: { labels: [], datasets: [{ label: 'Curah Hujan (mm)', data: [], backgroundColor: '#8b5cf6' }] }, options: chartOptions
+  });
+}
+initCharts();
+
+// =========================================================
+// 6. LOGIKA FETCH DATA & PENGELOMPOKAN (FILTERING) GRAFIK
+// =========================================================
+let rawDataArray = []; // Menyimpan SELURUH data yang masuk tanpa terhapus
+let drawChartTimeout;
+let tableIndex = 0;
+const tableBody = document.getElementById('tableBody');
+if (tableBody) tableBody.innerHTML = '';
+
+// Event ketika pilihan filter waktu diganti
+document.getElementById('timeFilter').addEventListener('change', () => {
+  processDataForChart(); // Hitung ulang array data untuk dirender ke grafik
+});
+
+// Ambil 1000 data masa lalu agar bisa dikelompokkan ke Jam/Hari/Bulan
+historyRef.limitToLast(1000).on('child_added', (snapshot) => {
+  const item = snapshot.val();
+  if (!item) return;
+
+  // 1. Simpan selalu ke dalam array (Data terus terakumulasi)
+  rawDataArray.push(item);
+  globalHistoryData.unshift(item); // Untuk CSV
+  tableIndex++;
+
+  // 2. Tampilkan di Tabel
+  const row = `
+    <tr>
+      <td>${tableIndex}</td>
+      <td>${item.timestamp || '-'}</td>
+      <td>${Math.round(item.suhu ?? 0)} °C</td>
+      <td>${Math.round(item.kelembapan ?? 0)} %</td>
+      <td>${Math.round(item.kecepatan_angin ?? 0)} m/s</td>
+      <td>${Math.round(item.cahaya_lux ?? 0)} Lux</td>
+      <td>${Math.round(item.curah_hujan ?? 0)}</td>
+    </tr>
+  `;
+  if(tableBody) {
+    tableBody.insertAdjacentHTML('afterbegin', row);
+  }
+
+  // 3. Render ulang grafik menggunakan sistem DEBOUNCE
+  // Agar browser tidak lag saat pertama kali load data yang banyak.
+  clearTimeout(drawChartTimeout);
+  drawChartTimeout = setTimeout(() => {
+    processDataForChart();
+  }, 300);
+});
+
+// FUNGSI UTAMA: Mengelompokkan data berdasarkan Menit/Jam/Hari/Bulan
+function processDataForChart() {
+  const filter = document.getElementById('timeFilter').value;
+  const grouped = {};
+
+  rawDataArray.forEach(item => {
+    if (!item.timestamp) return;
+    
+    // Pecah format "YYYY-MM-DD HH:mm:ss"
+    let parts = item.timestamp.split(' ');
+    let datePart = parts[0] || ""; 
+    let timePart = parts[1] || "00:00:00"; 
+    
+    let key = item.timestamp; // Default fallback
+
+    // Menentukan pengelompokan berdasarkan filter
+    if (filter === 'menit') {
+      key = datePart + ' ' + timePart.substring(0, 5); // Format: YYYY-MM-DD HH:mm
+    } else if (filter === 'jam') {
+      key = datePart + ' ' + timePart.substring(0, 2) + ':00'; // Format: YYYY-MM-DD HH:00
+    } else if (filter === 'hari') {
+      key = datePart; // Format: YYYY-MM-DD
+    } else if (filter === 'bulan') {
+      let dParts = datePart.split(/[-/]/);
+      if (dParts.length === 3) {
+        if (dParts[0].length === 4) {
+          key = dParts[0] + '-' + dParts[1]; // Format YYYY-MM
+        } else {
+          key = dParts[2] + '-' + dParts[1]; // Format DD-MM-YYYY -> YYYY-MM
+        }
+      } else {
+        key = datePart;
+      }
+    }
+
+    // Hitung akumulasi (Untuk dicari rata-ratanya nanti)
+    if (!grouped[key]) {
+      grouped[key] = { count: 0, suhu: 0, kelembapan: 0, angin: 0, cahaya: 0, hujan: 0 };
+    }
+    grouped[key].suhu += Number(item.suhu) || 0;
+    grouped[key].kelembapan += Number(item.kelembapan) || 0;
+    grouped[key].angin += Number(item.kecepatan_angin) || 0;
+    grouped[key].cahaya += Number(item.cahaya_lux) || 0;
+    grouped[key].hujan += Number(item.curah_hujan) || 0;
+    grouped[key].count += 1;
+  });
+
+  // Siapkan Array untuk diinject ke Chart.js
+  const labels = [];
+  const dataSuhu = [];
+  const dataKelembapan = [];
+  const dataAngin = [];
+  const dataCahaya = [];
+  const dataHujan = [];
+
+  Object.keys(grouped).forEach(k => {
+    labels.push(k);
+    let g = grouped[k];
+    
+    // Dapatkan Nilai Rata-rata dari kelompok jam/hari/bulan
+    dataSuhu.push((g.suhu / g.count).toFixed(1));
+    dataKelembapan.push((g.kelembapan / g.count).toFixed(1));
+    dataAngin.push((g.angin / g.count).toFixed(1));
+    dataCahaya.push((g.cahaya / g.count).toFixed(1));
+    dataHujan.push((g.hujan / g.count).toFixed(1)); 
+  });
+
+  // Timpa (Update) grafik dengan susunan data baru yang sudah di-filter
+  updateChartData(cSuhu, labels, dataSuhu);
+  updateChartData(cKelembapan, labels, dataKelembapan);
+  updateChartData(cCahaya, labels, dataCahaya);
+  updateChartData(cAngin, labels, dataAngin);
+  updateChartData(cHujan, labels, dataHujan);
+}
+
+function updateChartData(chart, labels, data) {
+  if (!chart) return;
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = data;
+  chart.update(); // Memicu re-render visual
+}
+
+// =========================================================
+// 7. LOGIKA UNDUH FILE CSV
+// =========================================================
+const btnDownloadCSV = document.getElementById('btnDownloadCSV');
+if(btnDownloadCSV) {
+  btnDownloadCSV.addEventListener('click', () => {
+    if (globalHistoryData.length === 0) {
+      alert("Belum ada data histori untuk diunduh.");
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "No,Waktu,Suhu (*C),Kelembapan (%),Kecepatan Angin (m/s),Cahaya (Lux),Curah Hujan (mm)\n";
+
+    globalHistoryData.forEach((row, index) => {
+      let barisData = [
+        index + 1,
+        row.timestamp || '-',
+        Math.round(row.suhu ?? 0),
+        Math.round(row.kelembapan ?? 0),
+        Math.round(row.kecepatan_angin ?? 0),
+        Math.round(row.cahaya_lux ?? 0),
+        Math.round(row.curah_hujan ?? 0)
+      ];
+      csvContent += barisData.join(",") + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Histori_Sistem_Energi.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
+</script>
+</body>
+</html>
