@@ -607,11 +607,11 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 
         <div class="card">
 
-          <div class="label">ALASAN BOOT HARDWARE</div>
+          <div class="label">TIPE BOOTING AWAL</div>
 
           <div class="value" id="cardResetReasonLive" style="font-size:15px; word-break:break-word; margin-top:10px;">-</div>
 
-          <div class="unit" id="cardBootCountLive">Boot ke-#0</div>
+          <div class="unit" id="cardBootCountLive">Boot ke-#0 (Metode Awal Nyala)</div>
 
         </div>
 
@@ -1133,13 +1133,20 @@ function updateEspWatchdog() {
     let showB = false;
 
     if (diffSec <= TIMEOUT_OFFLINE_SEC) {
-      if (latestDeviceStatus.uptime_detik != null && latestDeviceStatus.uptime_detik < 300) {
-        bClass = "diag-alert power-loss";
-        bHTML = `⚠️ <strong>Pemberitahuan Booting:</strong> ESP32 baru saja menyala ulang (< 5 menit lalu). Alasan Boot: <strong>${latestDeviceStatus.reset_reason || latestDeviceStatus.reset_short}</strong>. Jika sebelumnya sempat mati beberapa jam, hal ini menandakan perangkat sempat kehilangan daya listrik / aki drop / brownout.`;
-        showB = true;
-      } else if (latestDeviceStatus.uptime_detik != null && latestDeviceStatus.uptime_detik >= 1800) {
+      // Perangkat terdeteksi ONLINE
+      if (latestDeviceStatus.event === 'RECONNECTED_EVENT') {
         bClass = "diag-alert wifi-recovered";
-        bHTML = `ℹ️ <strong>Status Operasional Normal:</strong> ESP32 telah aktif kontinu selama <strong>${latestDeviceStatus.uptime_str || formatUptimeSec(latestDeviceStatus.uptime_detik)}</strong>. Jika sebelumnya data sempat kosong beberapa jam di web, perangkat tidak pernah mati; jeda tersebut murni akibat gangguan koneksi Wi-Fi / jaringan internet.`;
+        const offSec = latestDeviceStatus.offline_sec || latestDeviceStatus.offline_duration || 0;
+        const offStr = offSec >= 60 ? `${Math.floor(offSec / 60)} mnt ${offSec % 60} dtk` : `${offSec} dtk`;
+        bHTML = `ℹ️ <strong>Koneksi Wi-Fi Pulih:</strong> Jaringan Wi-Fi sempat terputus (${offStr}), namun ESP32 tetap menyala normal tanpa reboot (Uptime: <strong>${latestDeviceStatus.uptime_str || formatUptimeSec(latestDeviceStatus.uptime_detik)}</strong>). Catu daya 12V/aki dalam kondisi stabil.`;
+        showB = true;
+      } else if (latestDeviceStatus.uptime_detik != null && latestDeviceStatus.uptime_detik < 180 && latestDeviceStatus.event === 'BOOT_EVENT') {
+        bClass = "diag-alert power-loss";
+        bHTML = `⚠️ <strong>ESP32 Baru Saja Menyala Ulang (Cold Boot):</strong> Perangkat baru aktif selama <strong>${latestDeviceStatus.uptime_str || formatUptimeSec(latestDeviceStatus.uptime_detik)}</strong>. Tipe Boot Awal: <strong>${latestDeviceStatus.reset_reason || latestDeviceStatus.reset_short}</strong>. Jika data sebelumnya kosong lama, catu daya listrik/aki sempat terputus.`;
+        showB = true;
+      } else if (latestDeviceStatus.uptime_detik != null && latestDeviceStatus.uptime_detik >= 180) {
+        bClass = "diag-alert wifi-recovered";
+        bHTML = `ℹ️ <strong>ESP32 Beroperasi Normal:</strong> Perangkat telah menyala terus-menerus selama <strong>${latestDeviceStatus.uptime_str || formatUptimeSec(latestDeviceStatus.uptime_detik)}</strong> tanpa pernah restart. Sinyal Wi-Fi: <strong>${latestDeviceStatus.wifi_rssi || '-'} dBm</strong> (${latestDeviceStatus.wifi_quality || '-'}).`;
         showB = true;
       }
     } else {
