@@ -1628,11 +1628,23 @@ statusHistoryRef.limitToLast(500).on('child_added', (snapshot) => {
 
 
 
-  let eventBadge = (item.event === "BOOT_EVENT")
+  let eventBadge = "";
 
-    ? '<span style="background:#fee2e2; color:#b91c1c; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:11px;">BOOT EVENT</span>'
+  if (item.event === "BOOT_EVENT") {
 
-    : '<span style="background:#dbeafe; color:#1d4ed8; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:11px;">BERKALA</span>';
+    eventBadge = '<span style="background:#fee2e2; color:#b91c1c; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:11px;">BOOT EVENT</span>';
+
+  } else if (item.event === "RECONNECTED_EVENT") {
+
+    let durText = item.offline_duration_sec ? ` (${Math.round(item.offline_duration_sec / 60)} mnt offline)` : '';
+
+    eventBadge = `<span style="background:#ffedd5; color:#c2410c; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:11px;">RECONNECTED${durText}</span>`;
+
+  } else {
+
+    eventBadge = '<span style="background:#dbeafe; color:#1d4ed8; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:11px;">BERKALA</span>';
+
+  }
 
 
 
@@ -1698,7 +1710,7 @@ if (btnDownloadStatusCSV) {
 
     let csvContent = "data:text/csv;charset=utf-8,";
 
-    csvContent += "No,Waktu,Event,Status,Uptime (detik),Uptime (teks),Alasan Boot Hardware,Sinyal Wi-Fi (dBm),Sisa RAM (bytes),Siklus Boot\n";
+    csvContent += "No,Waktu,Event,Status,Uptime (detik),Uptime (teks),Alasan Boot Hardware,Sinyal Wi-Fi (dBm),Sisa RAM (bytes),Siklus Boot,Durasi Offline (detik)\n";
 
 
 
@@ -1724,7 +1736,9 @@ if (btnDownloadStatusCSV) {
 
         row.free_heap_bytes ?? '-',
 
-        row.boot_count ?? '-'
+        row.boot_count ?? '-',
+
+        row.offline_duration_sec ?? 0
 
       ];
 
