@@ -188,6 +188,15 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 
 @media(max-width:500px){.cards{grid-template-columns:1fr}}
 
+
+/* Styling Diagnostik ESP32 & Alert Banner */
+.diag-alert {margin-top:14px; padding:12px 16px; border-radius:10px; font-size:12px; line-height:1.5; display:none;}
+.diag-alert.power-loss {display:block; background:#fff1f2; border:1px solid #fecdd3; color:#be123c;}
+.diag-alert.wifi-recovered {display:block; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8;}
+.rssi-good {color:#16804e; font-weight:bold;}
+.rssi-fair {color:#d97706; font-weight:bold;}
+.rssi-poor {color:#dc2626; font-weight:bold;}
+
 </style>
 
 
@@ -346,7 +355,7 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 
         <div class="panel">
 
-          <h3>Informasi Sistem</h3>
+          <h3>Informasi Sistem &amp; Diagnostik Alat</h3>
 
           <div class="status">
 
@@ -364,17 +373,29 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 
             </div>
 
+            <div><span>Durasi Aktif (Uptime):</span> <strong id="espUptimeText">Memuat...</strong></div>
+
+            <div><span>Alasan Boot Terakhir:</span> <strong id="espBootReasonText">Memuat...</strong></div>
+
+            <div><span>Kekuatan Sinyal Wi-Fi:</span> <span id="espWifiRssiText">Memuat...</span></div>
+
             <div><span>Aktivitas Alat:</span> <strong id="espLastSeenText">Menunggu data pertama...</strong></div>
 
             <div><span>Pembaruan Data:</span> <strong id="lastUpdate">-</strong></div>
+
+            <div><span>Sisa Memori RAM Heap:</span> <strong id="espHeapText">-</strong></div>
+
+            <div><span>Siklus Boot (RTC):</span> <strong id="espBootCountText">-</strong></div>
 
             <div><span>Interval Pengiriman:</span> <span>Setiap 60 Detik</span></div>
 
             <div><span>Koneksi Database:</span> <strong id="dbStatusText" style="color: #bf4350;">Disconnected</strong></div>
 
-            <div><span>Lokasi Node:</span> <strong>/history</strong></div>
+            <div><span>Lokasi Node:</span> <strong>/history &amp; /device_status</strong></div>
 
           </div>
+
+          <div id="espDiagnosisBanner" class="diag-alert"></div>
 
         </div>
 
@@ -510,6 +531,12 @@ main{margin-left:245px;width:calc(100% - 245px);padding:0 30px 40px}
 
               <th>Curah Hujan</th>
 
+              <th>Uptime</th>
+
+              <th>Sinyal Wi-Fi</th>
+
+              <th>Status Boot</th>
+
             </tr>
 
           </thead>
@@ -626,6 +653,48 @@ updateClock();
 
 // =========================================================
 
+// 2.1. HELPER FORMAT TELEMETRI & DIAGNOSTIK ESP32
+
+// =========================================================
+
+function formatUptimeSec(sec) {
+
+  if (sec == null || isNaN(sec)) return '-';
+
+  let d = Math.floor(sec / 86400);
+
+  let h = Math.floor((sec % 86400) / 3600);
+
+  let m = Math.floor((sec % 3600) / 60);
+
+  let s = sec % 60;
+
+  if (d > 0) return `${d}h ${h}j ${m}m`;
+
+  if (h > 0) return `${h}j ${m}m ${s}d`;
+
+  return `${m}m ${s}d`;
+
+}
+
+
+
+function formatRssiBadge(rssi) {
+
+  if (rssi == null || rssi === 0) return '-';
+
+  let cls = rssi >= -70 ? 'rssi-good' : (rssi >= -85 ? 'rssi-fair' : 'rssi-poor');
+
+  let label = rssi >= -70 ? 'Kuat' : (rssi >= -85 ? 'Sedang' : 'Lemah');
+
+  return `<span class="${cls}">${rssi} dBm (${label})</span>`;
+
+}
+
+
+
+// =========================================================
+
 // 3. FIREBASE CONFIGURATION
 
 // =========================================================
@@ -641,6 +710,52 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let globalHistoryData = []; // Untuk CSV
+
+
+
+// Listener Telemetri Terpusat ESP32 (/device_status)
+
+let latestDeviceStatus = null;
+
+const statusRef = db.ref('device_status');
+
+statusRef.on('value', (snapshot) => {
+
+  const status = snapshot.val();
+
+  if (!status) return;
+
+  latestDeviceStatus = status;
+
+
+
+  const elUptime = document.getElementById('espUptimeText');
+
+  const elBoot = document.getElementById('espBootReasonText');
+
+  const elRssi = document.getElementById('espWifiRssiText');
+
+  const elHeap = document.getElementById('espHeapText');
+
+  const elCount = document.getElementById('espBootCountText');
+
+
+
+  if (elUptime) elUptime.textContent = status.uptime_str || formatUptimeSec(status.uptime_detik);
+
+  if (elBoot) elBoot.textContent = status.reset_reason || status.reset_short || '-';
+
+  if (elRssi) elRssi.innerHTML = formatRssiBadge(status.wifi_rssi);
+
+  if (elHeap) elHeap.textContent = status.free_heap_bytes ? `${Math.round(status.free_heap_bytes / 1024)} KB` : '-';
+
+  if (elCount) elCount.textContent = status.boot_count ? `Boot ke-#${status.boot_count}` : '-';
+
+
+
+  updateEspWatchdog();
+
+});
 
 
 
@@ -868,6 +983,46 @@ function updateEspWatchdog() {
 
   }
 
+
+
+  // Evaluasi Spanduk Diagnosa Cerdas (Mati Daya vs Sinyal Wi-Fi Terputus)
+
+  const diagBanner = document.getElementById('espDiagnosisBanner');
+
+  if (diagBanner && latestDeviceStatus) {
+
+    if (diffSec <= TIMEOUT_OFFLINE_SEC) {
+
+      if (latestDeviceStatus.uptime_detik != null && latestDeviceStatus.uptime_detik < 300) {
+
+        diagBanner.className = "diag-alert power-loss";
+
+        diagBanner.innerHTML = `⚠️ <strong>Pemberitahuan Booting:</strong> ESP32 baru saja menyala ulang (< 5 menit lalu). Alasan Boot: <strong>${latestDeviceStatus.reset_reason || latestDeviceStatus.reset_short}</strong>. Jika sebelumnya sempat mati beberapa jam, hal ini menandakan perangkat sempat kehilangan daya listrik / aki drop / brownout.`;
+
+      } else if (latestDeviceStatus.uptime_detik != null && latestDeviceStatus.uptime_detik >= 1800) {
+
+        diagBanner.className = "diag-alert wifi-recovered";
+
+        diagBanner.innerHTML = `ℹ️ <strong>Status Operasional Normal:</strong> ESP32 telah aktif kontinu selama <strong>${latestDeviceStatus.uptime_str || formatUptimeSec(latestDeviceStatus.uptime_detik)}</strong>. Jika sebelumnya data sempat kosong beberapa jam di web, perangkat tidak pernah mati; jeda tersebut murni akibat gangguan koneksi Wi-Fi / jaringan internet.`;
+
+      } else {
+
+        diagBanner.className = "diag-alert";
+
+        diagBanner.style.display = "none";
+
+      }
+
+    } else {
+
+      diagBanner.className = "diag-alert power-loss";
+
+      diagBanner.innerHTML = `⚠️ <strong>ESP32 Terputus:</strong> Tidak ada kiriman data baru dari ESP32 selama <strong>${Math.round(diffSec / 60)} menit</strong>. Periksa apakah catu daya 12V aki/adaptor masih mencukupi atau koneksi Wi-Fi stasiun cuaca terputus.`;
+
+    }
+
+  }
+
 }
 
 
@@ -1041,6 +1196,12 @@ historyRef.limitToLast(1000).on('child_added', (snapshot) => {
       <td>${Math.round(item.cahaya_lux ?? 0)} Lux</td>
 
       <td>${Math.round(item.curah_hujan ?? 0)}</td>
+
+      <td>${formatUptimeSec(item.uptime_detik)}</td>
+
+      <td>${formatRssiBadge(item.wifi_rssi)}</td>
+
+      <td>${item.reset_reason || '-'}</td>
 
     </tr>
 
@@ -1258,7 +1419,7 @@ if(btnDownloadCSV) {
 
     let csvContent = "data:text/csv;charset=utf-8,";
 
-    csvContent += "No,Waktu,Suhu (*C),Kelembapan (%),Kecepatan Angin (m/s),Cahaya (Lux),Curah Hujan (mm)\n";
+    csvContent += "No,Waktu,Suhu (*C),Kelembapan (%),Kecepatan Angin (m/s),Cahaya (Lux),Curah Hujan (mm),Uptime (detik),Sinyal Wi-Fi (dBm),Status Boot\n";
 
 
 
@@ -1278,7 +1439,13 @@ if(btnDownloadCSV) {
 
         Math.round(row.cahaya_lux ?? 0),
 
-        Math.round(row.curah_hujan ?? 0)
+        Math.round(row.curah_hujan ?? 0),
+
+        row.uptime_detik ?? '-',
+
+        row.wifi_rssi ?? '-',
+
+        `"${(row.reset_reason || '-').replace(/"/g, '""')}"`
 
       ];
 
